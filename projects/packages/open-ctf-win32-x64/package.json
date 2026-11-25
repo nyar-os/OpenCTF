@@ -1,0 +1,16 @@
+{
+    "name": "@wae/open-ctf-win32-x64",
+    "version": "0.0.2",
+    "description": "Windows x64 native addon for @wae/open-ctf",
+    "license": "Apache-2.0",
+    "os": ["win32"],
+    "cpu": ["x64"],
+    "main": "open-ctf.win32-x64.node",
+    "files": ["open-ctf.win32-x64.node", "README.md", "License.md"],
+    "engines": { "node": ">=18" },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nyar-os/OpenCTF.git",
+        "directory": "projects/packages/open-ctf-win32-x64"
+    }
+}

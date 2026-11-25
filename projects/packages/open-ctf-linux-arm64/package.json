@@ -1,0 +1,16 @@
+{
+    "name": "@wae/open-ctf-linux-arm64",
+    "version": "0.0.2",
+    "description": "Linux ARM64 native addon for @wae/open-ctf",
+    "license": "Apache-2.0",
+    "os": ["linux"],
+    "cpu": ["arm64"],
+    "main": "open-ctf.linux-arm64.node",
+    "files": ["open-ctf.linux-arm64.node", "README.md", "License.md"],
+    "engines": { "node": ">=18" },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nyar-os/OpenCTF.git",
+        "directory": "projects/packages/open-ctf-linux-arm64"
+    }
+}

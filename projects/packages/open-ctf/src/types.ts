@@ -1,0 +1,1378 @@
+/**
+ * Report shapes of `@wae/open-ctf`.
+ *
+ * These interfaces mirror the JSON the built-in engine returns. Numbers are
+ * plain JavaScript numbers: every offset, size and hash in this domain fits a
+ * safe integer, and hashes travel as hex strings.
+ */
+
+/** Detected container. */
+export type BinaryFormat = 'pe' | 'elf' | 'macho' | 'unknown';
+
+/** Detected architecture. */
+export type Architecture = 'x86' | 'x64' | 'arm' | 'arm64' | 'unknown';
+
+/** One section or segment. */
+export interface Section {
+    readonly name: string;
+    readonly virtualAddress: number;
+    readonly virtualSize: number;
+    readonly rawPointer: number;
+    readonly rawSize: number;
+    readonly characteristics: number;
+    readonly readable: boolean;
+    readonly writable: boolean;
+    readonly executable: boolean;
+}
+
+/** Header summary of an open binary. */
+export interface BinaryInfo {
+    readonly path: string;
+    readonly size: number;
+    readonly format: BinaryFormat;
+    readonly architecture: Architecture;
+    readonly hash: string;
+    readonly magic: string | null;
+    readonly endian: string | null;
+    readonly entry: number | null;
+    readonly entryRva: number | null;
+    readonly imageBase: number | null;
+    readonly sectionCount: number;
+    readonly cpuType: number | null;
+    readonly fileType: number | null;
+    readonly commandCount: number | null;
+}
+
+/** One printable ASCII run. */
+export interface StringHit {
+    readonly offset: number;
+    readonly length: number;
+    readonly value: string;
+}
+
+/** Encoding used to scan for strings. */
+export type StringEncoding = 'ascii' | 'utf16le' | 'both';
+
+/** Inputs of one `stringsEncoded()` call. */
+export interface StringsOptions {
+    /** Minimum number of characters in a run; defaults to 4. */
+    readonly minLength?: number;
+    /** Maximum number of hits; defaults to 100 and is capped at 10000 unless `all` is set. */
+    readonly limit?: number;
+    /** Number of leading hits to drop before the limit; defaults to 0. */
+    readonly skip?: number;
+    /** Bypass the 10000 cap and return up to 2000000 hits; defaults to false. */
+    readonly all?: boolean;
+    /** Encoding to scan for; defaults to `ascii`. */
+    readonly encoding?: StringEncoding;
+}
+
+/** One decoded string run. */
+export interface EncodedStringHit {
+    readonly offset: number;
+    readonly length: number;
+    readonly encoding: StringEncoding;
+    readonly value: string;
+}
+
+/** Bounded result of one encoded string scan. */
+export interface EncodedStringsReport {
+    readonly encoding: StringEncoding;
+    readonly minLength: number;
+    readonly limit: number;
+    readonly skip: number;
+    readonly all: boolean;
+    readonly hits: readonly EncodedStringHit[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Result of one atomic patch. */
+export interface PatchReport {
+    readonly path: string;
+    readonly offset: number;
+    readonly length: number;
+    readonly beforeHash: string;
+    readonly afterHash: string;
+}
+
+/** What the installed engine implements and what it does not. */
+export interface Capabilities {
+    readonly engine: { readonly package: string; readonly version: string; readonly api: string };
+    readonly formats: Readonly<Record<string, string>>;
+    readonly features: Readonly<Record<string, string>>;
+    readonly unsupported: Readonly<Record<string, string>>;
+    readonly architectures: Readonly<Record<string, string>>;
+}
+
+/** An open binary handle plus its header summary. */
+export interface BinaryHandle {
+    readonly handle: number;
+    readonly info: BinaryInfo;
+}
+
+/** Section listing. */
+export interface SectionsReport {
+    readonly sections: readonly Section[];
+}
+
+/** Bounded string extraction. */
+export interface StringsReport {
+    readonly hits: readonly StringHit[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One imported function. */
+export interface ImportEntry {
+    readonly module: string;
+    readonly name: string | null;
+    readonly ordinal: number | null;
+    readonly address: number | null;
+}
+
+/** Bounded import listing. */
+export interface ImportsReport {
+    readonly entries: readonly ImportEntry[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One exported symbol. */
+export interface ExportEntry {
+    readonly name: string | null;
+    readonly ordinal: number | null;
+    readonly address: number | null;
+    readonly forwarder: string | null;
+}
+
+/** Bounded export listing. */
+export interface ExportsReport {
+    readonly entries: readonly ExportEntry[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One debug or dynamic symbol. */
+export interface SymbolEntry {
+    readonly name: string;
+    readonly address: number;
+    readonly size: number;
+    readonly kind: string;
+    readonly binding: string;
+    readonly section: string | null;
+}
+
+/** Bounded symbol listing. */
+export interface SymbolsReport {
+    readonly entries: readonly SymbolEntry[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One `CodeView` payload from a PE debug directory. */
+export interface CodeViewInfo {
+    readonly signature: string;
+    readonly guid: string | null;
+    readonly age: number;
+    /** `NB10` record offset; `null` for `RSDS`. */
+    readonly offset: number | null;
+    /** `NB10` timestamp; `null` for `RSDS`. */
+    readonly timestamp: number | null;
+    readonly path: string;
+}
+
+/** One PE debug directory entry. */
+export interface DebugEntry {
+    readonly debugType: string;
+    readonly timestamp: number;
+    readonly majorVersion: number;
+    readonly minorVersion: number;
+    readonly sizeOfData: number;
+    readonly addressOfRawData: number;
+    readonly pointerToRawData: number;
+    readonly codeView: CodeViewInfo | null;
+}
+
+/** Bounded PE debug directory listing. */
+export interface DebugReport {
+    readonly entries: readonly DebugEntry[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Fixed part of a PE `VS_VERSIONINFO` resource. */
+export interface FixedFileInfo {
+    readonly signature: number;
+    readonly structVersion: number;
+    readonly fileVersion: string;
+    readonly productVersion: string;
+    readonly fileFlagsMask: number;
+    readonly fileFlags: number;
+    readonly fileOs: number;
+    readonly fileType: number;
+    readonly fileSubtype: number;
+    readonly fileDate: number;
+}
+
+/** One `StringFileInfo` key/value pair. */
+export interface VersionString {
+    readonly key: string;
+    readonly value: string;
+    readonly languageId: number;
+    readonly codepage: number;
+}
+
+/** Decoded PE version resource. */
+export interface VersionReport {
+    readonly present: boolean;
+    readonly fixed: FixedFileInfo | null;
+    readonly strings: readonly VersionString[];
+    readonly total: number;
+    readonly truncated: boolean;
+    readonly note: string | null;
+}
+
+/** One linked or identifying Mach-O dylib command. */
+export interface MachODylib {
+    readonly kind: 'load' | 'id' | 'weak' | 'reexport' | 'lazy' | 'upward';
+    readonly name: string;
+    readonly timestamp: number;
+    readonly currentVersion: string;
+    readonly compatibilityVersion: string;
+}
+
+/** One Mach-O segment. */
+export interface MachOSegment {
+    readonly name: string;
+    readonly vmAddress: number;
+    readonly vmSize: number;
+    readonly fileOffset: number;
+    readonly fileSize: number;
+    readonly readable: boolean;
+    readonly writable: boolean;
+    readonly executable: boolean;
+}
+
+/** One Mach-O section with its owning segment. */
+export interface MachOSection {
+    readonly segment: string;
+    readonly name: string;
+    readonly address: number;
+    readonly size: number;
+    readonly fileOffset: number;
+    readonly alignment: number;
+    readonly flags: number;
+    readonly readable: boolean;
+    readonly writable: boolean;
+    readonly executable: boolean;
+}
+
+/** Full Mach-O image summary. */
+export interface MachOReport {
+    readonly is64: boolean;
+    readonly endian: 'little' | 'big';
+    readonly cpuType: number;
+    readonly cpuSubtype: number;
+    readonly architecture: string;
+    readonly fileType: number;
+    readonly kind: string;
+    readonly flags: number;
+    readonly commandCount: number;
+    readonly sizeOfCommands: number;
+    readonly uuid: string | null;
+    readonly platform: string | null;
+    readonly minOs: string | null;
+    readonly sdk: string | null;
+    readonly entryOffset: number | null;
+    readonly entryAddress: number | null;
+    readonly dylibs: readonly MachODylib[];
+    readonly segments: readonly MachOSegment[];
+    readonly sections: readonly MachOSection[];
+}
+
+/** One `LC_SYMTAB` symbol. */
+export interface MachOSymbol {
+    readonly name: string;
+    readonly address: number;
+    readonly kind: 'undefined' | 'absolute' | 'section' | 'indirect' | 'prebound' | 'debug' | 'other';
+    readonly external: boolean;
+    readonly debug: boolean;
+    readonly section: number | null;
+    readonly descriptor: number;
+}
+
+/** Bounded Mach-O symbol table listing. */
+export interface MachOSymbolsReport {
+    readonly symbols: readonly MachOSymbol[];
+    readonly total: number;
+    readonly truncated: boolean;
+    readonly stringTableSize: number;
+}
+
+/** One symbol decoded from the dyld export trie. */
+export interface MachOExport {
+    readonly name: string;
+    readonly flags: number;
+    readonly flagNames: readonly string[];
+    readonly address: number | null;
+    readonly other: number | null;
+}
+
+/** Bounded listing of dyld export trie symbols. */
+export interface MachOExportsReport {
+    readonly present: boolean;
+    readonly exports: readonly MachOExport[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Encryption metadata from `LC_ENCRYPTION_INFO` or `LC_ENCRYPTION_INFO_64`. */
+export interface MachOEncryptionReport {
+    readonly present: boolean;
+    readonly cryptOffset: number;
+    readonly cryptSize: number;
+    readonly cryptId: number;
+    readonly encrypted: boolean;
+    readonly is64: boolean;
+}
+
+/** One import entry of the `LC_DYLD_CHAINED_FIXUPS` table. */
+export interface MachOChainedImport {
+    readonly libOrdinal: number;
+    readonly weakImport: boolean;
+    readonly nameOffset: number;
+    readonly name: string;
+    readonly addend: number | null;
+}
+
+/** Decoded `dyld_chained_fixups_header`. */
+export interface MachOChainedFixupsHeader {
+    readonly fixupsVersion: number;
+    readonly startsOffset: number;
+    readonly importsOffset: number;
+    readonly symbolsOffset: number;
+    readonly importsCount: number;
+    readonly importsFormat: number;
+    readonly symbolsFormat: number;
+}
+
+/** Summary of `LC_DYLD_CHAINED_FIXUPS`. */
+export interface MachOChainedFixupsReport {
+    readonly present: boolean;
+    readonly dataOffset: number;
+    readonly dataSize: number;
+    readonly header: MachOChainedFixupsHeader | null;
+    readonly imports: readonly MachOChainedImport[];
+    readonly truncated: boolean;
+    readonly startsInImage: number | null;
+    readonly startsInSegmentCount: number;
+}
+
+/** One binding decoded from a classic dyld bind opcode stream. */
+export interface MachOBinding {
+    readonly stream: string;
+    readonly address: number;
+    readonly segment: string;
+    readonly symbol: string;
+    readonly dylib: string;
+    readonly bindType: string;
+    readonly weak: boolean;
+    readonly addend: number;
+}
+
+/** Bounded listing of the classic dyld bind opcode streams. */
+export interface MachOBindingsReport {
+    readonly present: boolean;
+    readonly bindings: readonly MachOBinding[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Bounded listing of `LC_FUNCTION_STARTS` addresses. */
+export interface MachOFunctionStartsReport {
+    readonly imageBase: number;
+    readonly addresses: readonly number[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One architecture slice of a fat/universal Mach-O. */
+export interface MachOSlice {
+    readonly index: number;
+    readonly cpuType: number;
+    readonly cpuSubtype: number;
+    readonly architecture: string;
+    readonly offset: number;
+    readonly size: number;
+    readonly alignment: number;
+    readonly bits: 32 | 64 | null;
+}
+
+/** Fat/universal Mach-O architecture table. */
+export interface MachOSlicesReport {
+    readonly isFat64: boolean;
+    readonly slices: readonly MachOSlice[];
+}
+
+/** One fat slice written to a caller-chosen path. */
+export interface MachOSliceExtraction {
+    readonly index: number;
+    readonly architecture: string;
+    readonly offset: number;
+    readonly size: number;
+    readonly output: string;
+}
+
+/** A section mapped with both write and execute permission. */
+export interface WritableExecutableSection {
+    readonly name: string;
+    readonly address: number;
+    readonly size: number;
+}
+
+/** PE mitigation posture. */
+export interface MitigationsReport {
+    readonly dllCharacteristics: number;
+    readonly aslr: boolean;
+    readonly highEntropyVa: boolean;
+    readonly dep: boolean;
+    readonly cfg: boolean;
+    readonly forceIntegrity: boolean;
+    readonly noSeh: boolean;
+    readonly terminalServerAware: boolean;
+    readonly relocationsPresent: boolean;
+    readonly signed: boolean;
+    readonly writableExecutableSections: readonly WritableExecutableSection[];
+    readonly securityCookie: boolean | null;
+    readonly guardFlags: number | null;
+}
+
+/** One leaf entry of the PE resource directory. */
+export interface PeResource {
+    readonly resourceType: string;
+    readonly name: string;
+    readonly language: number;
+    readonly dataRva: number;
+    readonly size: number;
+    readonly codePage: number;
+}
+
+/** Bounded PE resource listing. */
+export interface ResourcesReport {
+    readonly present: boolean;
+    readonly resources: readonly PeResource[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Number of fixups of one PE relocation type. */
+export interface RelocationKindCount {
+    readonly kind: string;
+    readonly count: number;
+}
+
+/** One `IMAGE_BASE_RELOCATION` block. */
+export interface RelocationBlock {
+    readonly pageRva: number;
+    readonly blockSize: number;
+    readonly entries: number;
+    readonly kinds: readonly RelocationKindCount[];
+}
+
+/** Bounded PE base relocation listing. */
+export interface RelocationsReport {
+    readonly present: boolean;
+    readonly blocks: readonly RelocationBlock[];
+    readonly totalBlocks: number;
+    readonly totalEntries: number;
+    readonly kinds: readonly RelocationKindCount[];
+    readonly truncated: boolean;
+}
+
+/** Decoded `UNWIND_INFO` header of one x64 runtime function. */
+export interface PeUnwindInfo {
+    readonly version: number;
+    readonly flags: number;
+    readonly flagNames: readonly string[];
+    readonly prologSize: number;
+    readonly codeCount: number;
+    readonly frameRegister: number;
+    readonly frameOffset: number;
+    readonly chained: boolean;
+}
+
+/** One `RUNTIME_FUNCTION` entry of the PE exception directory. */
+export interface PeRuntimeFunction {
+    readonly beginAddress: number;
+    readonly endAddress: number;
+    readonly unwindInfo: number;
+    readonly unwindOffset: number | null;
+    readonly unwind: PeUnwindInfo | null;
+}
+
+/** Bounded PE exception directory listing. */
+export interface PeExceptionReport {
+    readonly present: boolean;
+    readonly machine: number;
+    readonly machineName: string;
+    readonly entryFormat: 'x64' | 'arm64' | 'arm' | 'unknown';
+    readonly entrySize: number | null;
+    readonly functions: readonly PeRuntimeFunction[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One delay thunk: the INT entry, its parallel IAT slot and the import. */
+export interface PeDelayThunk {
+    readonly intRva: number;
+    readonly iatRva: number | null;
+    readonly name: string | null;
+    readonly ordinal: number | null;
+    readonly hint: number | null;
+}
+
+/** One delay-loaded module and its decoded thunks. */
+export interface PeDelayModule {
+    readonly name: string;
+    readonly attributes: number;
+    readonly timestamp: number;
+    readonly moduleHandleRva: number;
+    readonly iatRva: number;
+    readonly intRva: number;
+    readonly boundIatRva: number;
+    readonly unloadIatRva: number;
+    readonly thunks: readonly PeDelayThunk[];
+}
+
+/** Bounded PE delay-import listing. */
+export interface PeDelayImportsReport {
+    readonly present: boolean;
+    readonly directoryRva: number;
+    readonly directorySize: number;
+    readonly modules: readonly PeDelayModule[];
+    readonly totalModules: number;
+    readonly totalThunks: number;
+    readonly truncated: boolean;
+}
+
+/** One forwarder reference inside a bound import descriptor. */
+export interface PeBoundForwarder {
+    readonly timestamp: number;
+    readonly offsetModuleName: number;
+    readonly name: string;
+}
+
+/** One bound import descriptor and its inline forwarder references. */
+export interface PeBoundModule {
+    readonly timestamp: number;
+    readonly offsetModuleName: number;
+    readonly name: string;
+    readonly forwarders: readonly PeBoundForwarder[];
+}
+
+/** Bounded PE bound-import listing. */
+export interface PeBoundImportsReport {
+    readonly present: boolean;
+    readonly directoryRva: number;
+    readonly directorySize: number;
+    readonly modules: readonly PeBoundModule[];
+    readonly totalModules: number;
+    readonly totalForwarders: number;
+    readonly truncated: boolean;
+}
+
+/** One decoded Rich header entry. */
+export interface PeRichEntry {
+    readonly compId: number;
+    readonly build: number;
+    readonly count: number;
+    readonly name: string | null;
+}
+
+/** Decoded PE Rich header. */
+export interface PeRichHeaderReport {
+    readonly present: boolean;
+    readonly richOffset: number;
+    readonly dansOffset: number;
+    readonly key: number;
+    readonly entries: readonly PeRichEntry[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One `.symtab` entry. */
+export interface ElfStaticSymbol {
+    readonly name: string;
+    readonly value: number;
+    readonly size: number;
+    readonly symbolType: string;
+    readonly binding: string;
+    readonly visibility: string;
+    readonly section: string;
+}
+
+/** Bounded ELF static symbol listing. */
+export interface ElfStaticSymbolsReport {
+    readonly present: boolean;
+    readonly is64: boolean;
+    readonly symbols: readonly ElfStaticSymbol[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Dynamic linking facts of one ELF image. */
+export interface ElfDynamicReport {
+    readonly present: boolean;
+    readonly interpreter: string | null;
+    readonly soname: string | null;
+    readonly needed: readonly string[];
+    readonly rpath: readonly string[];
+    readonly runpath: readonly string[];
+    readonly dynamicEntries: number;
+    readonly truncated: boolean;
+}
+
+/** Decoded `NT_GNU_ABI_TAG` description. */
+export interface ElfAbiTag {
+    readonly os: string;
+    readonly major: number;
+    readonly minor: number;
+    readonly subminor: number;
+}
+
+/** One entry of a `NT_GNU_PROPERTY_TYPE_0` note. */
+export interface ElfGnuProperty {
+    readonly propertyType: string;
+    readonly dataSize: number;
+    readonly data: string;
+}
+
+/** One ELF note record. */
+export interface ElfNote {
+    readonly owner: string;
+    readonly noteType: string;
+    readonly descriptionSize: number;
+    readonly description: string;
+}
+
+/** ELF note facts of one image. */
+export interface ElfNotesReport {
+    readonly present: boolean;
+    readonly source: string | null;
+    readonly buildId: string | null;
+    readonly abiTag: ElfAbiTag | null;
+    readonly properties: readonly ElfGnuProperty[];
+    readonly notes: readonly ElfNote[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One decoded Mach-O `CodeDirectory` blob. */
+export interface MachOCodeDirectory {
+    readonly version: number;
+    readonly flags: number;
+    readonly flagText: readonly string[];
+    readonly hashType: string;
+    readonly hashSize: number;
+    readonly pageSize: number;
+    readonly codeLimit: number;
+    readonly identifier: string;
+    readonly teamId: string | null;
+    readonly codeSlots: number;
+    readonly specialSlots: number;
+}
+
+/** Mach-O embedded code signature summary. */
+export interface MachOCodeSignatureReport {
+    readonly present: boolean;
+    readonly dataOffset: number;
+    readonly dataSize: number;
+    readonly magic: string | null;
+    readonly blobCount: number | null;
+    readonly blobTypes: readonly string[];
+    readonly codeDirectory: MachOCodeDirectory | null;
+    readonly truncated: boolean;
+}
+
+/** One ELF program header entry. */
+export interface ElfSegment {
+    readonly index: number;
+    readonly segmentType: string;
+    readonly typeValue: number;
+    readonly offset: number;
+    readonly virtualAddress: number;
+    readonly physicalAddress: number;
+    readonly fileSize: number;
+    readonly memorySize: number;
+    readonly flags: number;
+    readonly flagText: string;
+    readonly alignment: number;
+}
+
+/** ELF program header table summary. */
+export interface ElfSegmentsReport {
+    readonly present: boolean;
+    readonly is64: boolean;
+    readonly segments: readonly ElfSegment[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** One `WIN_CERTIFICATE` entry of the PE attribute certificate table. */
+export interface PeCertificate {
+    readonly offset: number;
+    readonly length: number;
+    readonly revision: string;
+    readonly certificateType: string;
+    readonly payloadSize: number;
+    readonly pkcs7: boolean;
+}
+
+/** Attribute certificate table summary. */
+export interface CertificatesReport {
+    readonly present: boolean;
+    readonly certificates: readonly PeCertificate[];
+    readonly total: number;
+    readonly directorySize: number;
+    readonly truncated: boolean;
+}
+
+/** One PE TLS callback address and its file mapping. */
+export interface PeTlsCallback {
+    readonly address: number;
+    readonly rva: number | null;
+    readonly offset: number | null;
+}
+
+/** PE TLS table summary. */
+export interface PeTlsReport {
+    readonly present: boolean;
+    readonly is64: boolean;
+    readonly directoryRva: number;
+    readonly directorySize: number;
+    readonly rawDataStart: number;
+    readonly rawDataEnd: number;
+    readonly indexAddress: number;
+    readonly callbacksAddress: number;
+    readonly callbacksRva: number | null;
+    readonly sizeOfZeroFill: number;
+    readonly characteristics: number;
+    readonly callbacks: readonly PeTlsCallback[];
+    readonly truncated: boolean;
+}
+
+/** `CodeIntegrity` block of the PE load configuration. */
+export interface CodeIntegrityInfo {
+    readonly flags: number;
+    readonly catalog: number;
+    readonly catalogOffset: number;
+}
+
+/** PE load configuration summary. */
+export interface PeLoadConfigReport {
+    readonly present: boolean;
+    readonly is64: boolean;
+    readonly size: number;
+    readonly timestamp: number;
+    readonly majorVersion: number;
+    readonly minorVersion: number;
+    readonly globalFlagsClear: number;
+    readonly globalFlagsSet: number;
+    readonly criticalSectionDefaultTimeout: number;
+    readonly deCommitFreeBlockThreshold: number;
+    readonly deCommitTotalFreeThreshold: number;
+    readonly lockPrefixTable: number;
+    readonly maximumAllocationSize: number;
+    readonly virtualMemoryThreshold: number;
+    readonly processAffinityMask: number;
+    readonly processHeapFlags: number;
+    readonly csdVersion: number;
+    readonly dependentLoadFlags: number;
+    readonly editList: number;
+    readonly securityCookie: number;
+    readonly seHandlerTable: number;
+    readonly seHandlerCount: number;
+    readonly guardCfCheckFunctionPointer: number;
+    readonly guardCfDispatchFunctionPointer: number;
+    readonly guardCfFunctionTable: number;
+    readonly guardCfFunctionCount: number;
+    readonly guardFlags: number;
+    readonly guardFlagsText: readonly string[];
+    readonly codeIntegrity: CodeIntegrityInfo;
+    readonly truncated: boolean;
+}
+
+/** Entropy of one section payload. */
+export interface SectionEntropy {
+    readonly name: string;
+    readonly offset: number;
+    readonly size: number;
+    readonly entropy: number;
+}
+
+/** Bytes that follow the last PE section payload. */
+export interface OverlayInfo {
+    readonly offset: number;
+    readonly size: number;
+}
+
+/** Entropy summary of one binary. */
+export interface EntropyReport {
+    readonly fileSize: number;
+    readonly fileEntropy: number;
+    readonly sections: readonly SectionEntropy[];
+    readonly overlay: OverlayInfo | null;
+}
+
+/** One container or archive signature found inside a PE overlay. */
+export interface OverlaySignature {
+    readonly offset: number;
+    readonly kind: string;
+    readonly detail: string | null;
+}
+
+/** Anatomy of the bytes that follow the last PE section payload. */
+export interface OverlayReport {
+    readonly present: boolean;
+    readonly offset: number;
+    readonly size: number;
+    readonly ratio: number;
+    readonly entropy: number;
+    readonly leadingMagic: string;
+    readonly leadingKind: string;
+    readonly container: string | null;
+    readonly detail: string | null;
+    readonly signatures: readonly OverlaySignature[];
+    readonly truncated: boolean;
+}
+
+/** One contiguous run of differing bytes. */
+export interface DiffRange {
+    readonly offset: number;
+    readonly length: number;
+}
+
+/** Result of one `diff()` call. */
+export interface DiffReport {
+    readonly leftSize: number;
+    readonly rightSize: number;
+    readonly leftHash: string;
+    readonly rightHash: string;
+    readonly identical: boolean;
+    readonly firstDifference: number | null;
+    readonly differences: readonly DiffRange[];
+    readonly total: number;
+    readonly truncated: boolean;
+    readonly comparedBytes: number;
+}
+
+/** Assembly syntax accepted by `disasm()`. */
+export type DisassemblySyntax = 'intel' | 'masm' | 'nasm';
+
+/** What `disasm()` decodes: machine code, CPython bytecode or a sniff. */
+export type DisassemblyFormat = 'auto' | 'x86' | 'pyc';
+
+/** Inputs of one `disasm()` call. */
+export interface DisassembleOptions {
+    /** File offset to start decoding from. Defaults to 0. */
+    readonly offset?: number;
+    /** Maximum number of instructions; defaults to 64 and is capped at 4096. */
+    readonly count?: number;
+    /** Rendered syntax; defaults to `intel`. Applies to `x86` only. */
+    readonly syntax?: DisassemblySyntax;
+    /** Decoding path; `auto` sniffs `offset` for bytecode, defaults to `auto`. */
+    readonly format?: DisassemblyFormat;
+    /** Keep only code objects whose `qualname` or `name` contains this text. Applies to `pyc` only. */
+    readonly code?: string;
+    /** Opcode table for a raw marshal stream: `311`, `312` or `313`. A pyc container always selects the table named by its magic. Applies to `pyc` only. */
+    readonly python?: number;
+    /** Cap on decoded code objects; defaults to 1024 and is capped at 16384. Applies to `pyc` only. */
+    readonly codeLimit?: number;
+    /** Cap on emitted instructions; defaults to 65536 and is capped at 1048576. Applies to `pyc` only. */
+    readonly instructionLimit?: number;
+}
+
+/** One decoded instruction. */
+export interface DisassemblyInstruction {
+    readonly address: number;
+    readonly offset: number;
+    readonly length: number;
+    readonly bytes: string;
+    readonly text: string;
+}
+
+/** Result of one disassembly request. */
+export interface DisassemblyReport {
+    readonly architecture: string;
+    readonly bitness: number;
+    readonly startOffset: number;
+    readonly startAddress: number;
+    readonly syntax: string;
+    readonly instructions: readonly DisassemblyInstruction[];
+    readonly truncated: boolean;
+}
+
+/** Pattern kinds accepted by `search()`. */
+export type SearchMode = 'hex' | 'ascii' | 'utf16le';
+
+/** Inputs of one `search()` call. */
+export interface SearchOptions {
+    readonly mode: SearchMode;
+    readonly pattern: string;
+    /** Whether ASCII letters must match case. Defaults to false. */
+    readonly caseSensitive?: boolean;
+    /** Whether matches must be surrounded by non-word characters. Defaults to false. */
+    readonly wholeWord?: boolean;
+    /** Maximum number of hits to return. Defaults to 100; `null` means unlimited. */
+    readonly limit?: number | null;
+    /** First file offset to scan. */
+    readonly start?: number;
+    /** One past the last file offset to scan. */
+    readonly end?: number;
+}
+
+/** One pattern match. */
+export interface SearchHit {
+    readonly offset: number;
+    readonly preview: string;
+}
+
+/** Bounded search result. */
+export interface SearchReport {
+    readonly mode: string;
+    readonly hits: readonly SearchHit[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Inputs of one `find()` call. */
+export interface FindOptions {
+    /** Regular expression evaluated against the raw file bytes. */
+    readonly pattern: string;
+    /** Whether ASCII letters match case-insensitively; defaults to false. */
+    readonly caseInsensitive?: boolean;
+    /** Number of leading matches to drop before the limit; defaults to 0. */
+    readonly skip?: number;
+    /** Maximum number of hits; defaults to 100 and is capped at 5000. `null` requests the cap. */
+    readonly limit?: number | null;
+    /** Bytes rendered into each hit preview; defaults to 80 and is capped at 512. */
+    readonly context?: number;
+}
+
+/** One regex match with its position and a printable preview. */
+export interface FindHit {
+    readonly offset: number;
+    readonly length: number;
+    readonly preview: string;
+}
+
+/** Bounded result of one byte-regex search. */
+export interface FindReport {
+    readonly pattern: string;
+    readonly caseInsensitive: boolean;
+    readonly skip: number;
+    readonly limit: number;
+    readonly context: number;
+    readonly hits: readonly FindHit[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** File offset mapped onto an absolute virtual address. */
+export interface OffsetToVaReport {
+    readonly offset: number;
+    readonly va: number;
+}
+
+/** File offset mapped onto a PE image-relative address. */
+export interface OffsetToRvaReport {
+    readonly offset: number;
+    readonly rva: number;
+}
+
+/** Hex dump of one byte range. */
+export interface HexdumpReport {
+    readonly offset: number;
+    readonly length: number;
+    readonly text: string;
+}
+
+/** Raw byte read rendered as hex. */
+export interface ReadReport {
+    readonly offset: number;
+    readonly length: number;
+    readonly hex: string;
+}
+
+/** RVA to file-offset mapping. */
+export interface RvaReport {
+    readonly rva: number;
+    readonly offset: number;
+}
+
+/** Inputs of one `dump()` call. */
+export interface DumpOptions {
+    /** File offset of the first byte to export. */
+    readonly offset: number;
+    /** Number of bytes to export; the engine clamps the value at 64 MiB. */
+    readonly length: number;
+    /** Destination file the raw bytes are written to. */
+    readonly output: string;
+}
+
+/** Result of one raw byte-range export. */
+export interface DumpReport {
+    readonly offset: number;
+    readonly length: number;
+    readonly written: number;
+    readonly output: string;
+}
+
+/** Compression wrapper accepted by `inflate()`. */
+export type InflateFormat = 'auto' | 'zlib' | 'gzip' | 'raw';
+
+/** Inputs of one `inflate()` call. */
+export interface InflateOptions {
+    /** File offset of the first compressed byte. */
+    readonly offset: number;
+    /** Wrapper to expect; defaults to `auto` and infers it from the first bytes. */
+    readonly format?: InflateFormat;
+    /** Output cap in bytes; defaults to 4 MiB and is capped at 64 MiB. */
+    readonly limit?: number;
+    /** Destination file for the decoded bytes. */
+    readonly output?: string;
+}
+
+/** Result of one `inflate()` call. */
+export interface InflateReport {
+    readonly offset: number;
+    readonly format: string;
+    readonly inputBytes: number;
+    readonly outputBytes: number;
+    readonly limit: number;
+    readonly status: string;
+    readonly truncated: boolean;
+    readonly magic: string;
+    readonly headAscii: string;
+    readonly output: string | null;
+}
+
+/** Container format selector of one `unpack()` call. */
+export type UnpackFormat = 'auto' | '7z' | 'asar' | 'nsis' | 'pyinstaller' | 'pyz';
+
+/** Inputs of one `unpack()` call. */
+export interface UnpackOptions {
+    /** Container format; `auto` sniffs the bytes at `offset`. */
+    readonly format?: UnpackFormat;
+    /** Absolute offset of the container start; when omitted `auto` scans for an NSIS header. */
+    readonly offset?: number;
+    /** Cap on listed container entries; defaults to 4096 and is capped at 65536. */
+    readonly entriesLimit?: number;
+    /** Cap on rendered NSIS script commands; defaults to 4096 and is capped at 65536. */
+    readonly commandsLimit?: number;
+    /** Cap on rendered NSIS strings; defaults to 8192 and is capped at 65536. */
+    readonly stringsLimit?: number;
+    /** Directory the container entries are extracted into. */
+    readonly extractDir?: string;
+    /** Cap on one extracted file in bytes; defaults to 256 MiB and is capped at 1 GiB. */
+    readonly extractLimit?: number;
+}
+
+/** The 28-byte NSIS first header plus the container framing facts. */
+export interface NsisHeader {
+    readonly startOffset: number;
+    readonly flags: number;
+    readonly headerSize: number;
+    readonly arcSize: number;
+    readonly dataStreamOffset: number;
+    readonly compressedHeaderSize: number;
+    readonly solid: boolean;
+    readonly method: string;
+    readonly dataBase: number | null;
+}
+
+/** One of the eight blocks inside the decompressed header block. */
+export interface NsisBlock {
+    readonly name: string;
+    readonly offset: number;
+    readonly num: number;
+}
+
+/** One decoded script command. */
+export interface NsisCommand {
+    readonly index: number;
+    readonly offset: number;
+    readonly opcode: number;
+    readonly name: string;
+    readonly params: number[];
+    readonly rendered: string[];
+}
+
+/** One file the installer extracts (a `File` command). */
+export interface NsisFile {
+    readonly index: number;
+    readonly commandIndex: number;
+    readonly output: string;
+    readonly dataOffset: number | null;
+    readonly uncompressedSize: number | null;
+    readonly compressedSize: number | null;
+    readonly modified: number | null;
+    readonly extracted: string | null;
+}
+
+/** Full decode of one NSIS container. */
+export interface NsisReport {
+    readonly header: NsisHeader;
+    readonly blocks: NsisBlock[];
+    readonly unicode: boolean;
+    readonly stringChars: number;
+    readonly strings: string[];
+    readonly commandCount: number;
+    readonly commands: NsisCommand[];
+    readonly files: NsisFile[];
+    readonly truncated: boolean;
+}
+
+/** The 16-byte asar header plus the derived data-area facts. */
+export interface AsarHeader {
+    readonly startOffset: number;
+    readonly blockSize: number;
+    readonly stringBlockSize: number;
+    readonly stringSize: number;
+    readonly dataStart: number;
+}
+
+/** One file listed in the asar header tree. */
+export interface AsarEntry {
+    readonly path: string;
+    readonly size: number;
+    readonly offset: number | null;
+    readonly unpacked: boolean;
+    readonly extracted: string | null;
+}
+
+/** Full decode of one asar archive. */
+export interface AsarReport {
+    readonly header: AsarHeader;
+    readonly entryCount: number;
+    readonly directoryCount: number;
+    readonly packedBytes: number;
+    readonly entries: AsarEntry[];
+    readonly truncated: boolean;
+}
+
+/** One packed 7z folder range inside the container. */
+export interface SevenZPackRange {
+    readonly start: number;
+    readonly length: number;
+}
+
+/** One packed 7z folder: a coder chain feeding the entry sub-streams. */
+export interface SevenZFolder {
+    readonly index: number;
+    readonly coders: string[];
+    readonly packRanges: SevenZPackRange[];
+    readonly unpackSize: number;
+    readonly crc: number | null;
+    readonly subStreamCount: number;
+}
+
+/** One 7z archive entry (file or directory). */
+export interface SevenZEntry {
+    readonly index: number;
+    readonly name: string;
+    readonly size: number | null;
+    readonly offset: number | null;
+    readonly attributes: number | null;
+    readonly isDir: boolean;
+    readonly isAnti: boolean;
+    readonly folderIndex: number | null;
+    readonly crc: number | null;
+    readonly extracted: string | null;
+}
+
+/** Facts indexed from one 7z container header. */
+export interface SevenZReport {
+    readonly startOffset: number;
+    readonly version: string;
+    readonly methods: string[];
+    readonly folderCount: number;
+    readonly entryCount: number;
+    readonly totalUnpackSize: number;
+    readonly folders: SevenZFolder[];
+    readonly entries: SevenZEntry[];
+    readonly truncated: boolean;
+}
+
+/** One `CArchive` table-of-contents entry. */
+export interface PyInstallerEntry {
+    readonly index: number;
+    readonly name: string;
+    readonly typecode: string;
+    readonly kind: string;
+    readonly offset: number;
+    readonly length: number;
+    readonly compressLength: number;
+    readonly compressed: boolean;
+    readonly moduleCount: number | null;
+    readonly modules: PyInstallerModule[];
+    readonly extracted: string | null;
+    readonly truncated: boolean;
+}
+
+/** One module listed in a `PYZ` table of contents. */
+export interface PyInstallerModule {
+    readonly name: string;
+    readonly isPackage: boolean;
+    readonly offset: number;
+    readonly length: number;
+    readonly extracted: string | null;
+}
+
+/** Full decode of one PyInstaller `CArchive` or standalone `PYZ` container. */
+export interface PyInstallerReport {
+    readonly archiveKind: string;
+    readonly startOffset: number;
+    readonly cookieOffset: number | null;
+    readonly packageLength: number | null;
+    readonly tocOffset: number | null;
+    readonly tocLength: number | null;
+    readonly versionWord: number | null;
+    readonly version: string | null;
+    readonly pythonMagic: number | null;
+    readonly python: string | null;
+    readonly entryCount: number;
+    readonly entries: PyInstallerEntry[];
+    readonly modules: PyInstallerModule[];
+    readonly truncated: boolean;
+}
+
+/** The decoded container, discriminated by the format that produced it. */
+export type UnpackReport =
+    | ({ readonly format: '7z' } & SevenZReport)
+    | ({ readonly format: 'asar' } & AsarReport)
+    | ({ readonly format: 'nsis' } & NsisReport)
+    | ({ readonly format: 'pyinstaller' } & PyInstallerReport);
+
+/** One decoded constant of a code object. */
+export interface PycConst {
+    readonly kind: string;
+    readonly repr: string;
+    readonly codeIndex: number | null;
+}
+
+/** One disassembled instruction of a code object. */
+export interface PycInstruction {
+    readonly offset: number;
+    readonly opcode: number;
+    readonly name: string;
+    readonly arg: number | null;
+    readonly resolved: string | null;
+    readonly caches: number;
+}
+
+/** One decoded code object with its disassembly. */
+export interface PycCodeObject {
+    readonly index: number;
+    readonly qualname: string;
+    readonly name: string;
+    readonly filename: string;
+    readonly argcount: number;
+    readonly posonlyargcount: number;
+    readonly kwonlyargcount: number;
+    readonly stacksize: number;
+    readonly flags: number;
+    readonly flagsText: string;
+    readonly firstlineno: number;
+    readonly codeLen: number;
+    readonly linetableLen: number;
+    readonly exceptiontableLen: number;
+    readonly names: readonly string[];
+    readonly varnames: readonly string[];
+    readonly freevars: readonly string[];
+    readonly cellvars: readonly string[];
+    readonly consts: readonly PycConst[];
+    readonly instructions: readonly PycInstruction[];
+    readonly truncated: boolean;
+}
+
+/** Full decode of one marshal stream or pyc container. */
+export interface PycReport {
+    readonly startOffset: number;
+    readonly sourceFormat: string;
+    readonly marshalVersion: number | null;
+    readonly pycMagic: number | null;
+    readonly pycFlags: number | null;
+    readonly python: string | null;
+    /** Opcode table the bytecode was decoded with, e.g. `3.12`. */
+    readonly opcodeTable: string;
+    readonly codeCount: number;
+    readonly instructionCount: number;
+    readonly codes: readonly PycCodeObject[];
+    readonly truncated: boolean;
+}
+
+/** Inputs of one `carve()` call. */
+export interface CarveOptions {
+    /** Byte regex that marks the regions of interest. */
+    readonly marker: string;
+    /** Regions shorter than this many bytes are dropped; defaults to 200. */
+    readonly minRegion?: number;
+    /** Right expansion stops after this many bytes; defaults to 262144. */
+    readonly maxRegion?: number;
+    /** Left expansion stops after this many bytes; defaults to 4096. */
+    readonly expandLeft?: number;
+    /** Maximum marker matches to examine; defaults to 20 and is capped at 100. */
+    readonly limit?: number;
+    /** Directory the carved regions are written to as `carve_<n>.bin`. */
+    readonly outputDir?: string;
+}
+
+/** One printable region anchored on a marker match. */
+export interface CarveRegion {
+    readonly markerOffset: number;
+    readonly regionOffset: number;
+    readonly regionLength: number;
+    readonly preview: string;
+    readonly file: string | null;
+}
+
+/** Bounded result of one marker carve. */
+export interface CarveReport {
+    readonly marker: string;
+    readonly minRegion: number;
+    readonly maxRegion: number;
+    readonly expandLeft: number;
+    readonly limit: number;
+    readonly outputDir: string | null;
+    readonly regions: readonly CarveRegion[];
+    readonly total: number;
+    readonly truncated: boolean;
+}
+
+/** Inputs of one `tauriAssets()` call. */
+export interface TauriAssetsOptions {
+    /** Directory the decoded assets are written to, mirroring their key paths. */
+    readonly outputDir?: string;
+    /** Maximum number of assets to return; defaults to 200 and is capped at 1000. */
+    readonly limit?: number;
+}
+
+/** One embedded Tauri asset recovered from the interleaved table. */
+export interface TauriAsset {
+    readonly key: string;
+    readonly blobOffset: number;
+    readonly compressedLen: number;
+    readonly decompressedLen: number;
+    readonly preview: string;
+    readonly file: string | null;
+}
+
+/** Bounded result of one Tauri asset extraction. */
+export interface TauriAssetsReport {
+    readonly assets: readonly TauriAsset[];
+    readonly total: number;
+    readonly truncated: boolean;
+    readonly outputDir: string | null;
+}
