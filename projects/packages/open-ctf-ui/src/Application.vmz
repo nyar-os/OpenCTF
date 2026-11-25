@@ -1,0 +1,79 @@
+<template>
+    <div class="ctf-app">
+        <slot />
+    </div>
+</template>
+
+<style>
+:root {
+    --ctf-bg: #0e1116;
+    --ctf-panel: #151a22;
+    --ctf-panel-2: #1b222c;
+    --ctf-panel-3: #212a36;
+    --ctf-ink: #e6edf3;
+    --ctf-muted: #8b98a5;
+    --ctf-line: #28313d;
+    --ctf-accent: #4cc9c0;
+    --ctf-accent-soft: #12312f;
+    --ctf-warn: #e0b341;
+    --ctf-danger: #e06c75;
+    --ctf-radius: 8px;
+    --ctf-radius-sm: 5px;
+    --ctf-mono: "Cascadia Code", "Consolas", monospace;
+    --ctf-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+    --ctf-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: var(--ctf-bg);
+    color: var(--ctf-ink);
+    font-family: var(--ctf-sans);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+h1,
+h2,
+h3 {
+    margin: 0;
+    font-weight: 600;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+input,
+textarea,
+select {
+    font: inherit;
+    color: inherit;
+}
+
+.ctf-app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+</style>
+
+<script client>
+export default class Application {}
+</script>

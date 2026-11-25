@@ -1,0 +1,6 @@
+{
+    "app": {
+        "title": "OpenCTF Studio — CTF toolbox",
+        "disconnected": "Native host not connected — no file is read"
+    }
+}

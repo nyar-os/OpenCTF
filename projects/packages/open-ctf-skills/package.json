@@ -1,0 +1,27 @@
+{
+    "name": "@wae/open-ctf-skills",
+    "version": "0.0.2",
+    "description": "Agent skills for OpenCTF: CTF challenge triage, container unpacking, bytecode decoding and patch verification",
+    "license": "Apache-2.0",
+    "type": "module",
+    "engines": {
+        "node": ">=18"
+    },
+    "files": [
+        "skills"
+    ],
+    "keywords": [
+        "open-ctf",
+        "binary",
+        "pe",
+        "elf",
+        "macho",
+        "skills",
+        "agent"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nyar-os/OpenCTF.git",
+        "directory": "projects/packages/open-ctf-skills"
+    }
+}
