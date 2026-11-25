@@ -88,9 +88,9 @@ running the core tests.
 
 ## Release and publishing
 
-Only the platform packages are publishable today. `@wae/open-ctf`,
-`@wae/open-ctf-skills`, `@wae/open-ctf-ui` and the homepage are `private: true`,
-and `wae.config.ts` leaves `release` unset.
+The publishable set is the five platform addon packages plus
+`@wae/open-ctf-skills`. `@wae/open-ctf`, `@wae/open-ctf-ui` and the homepage are
+`private: true`, and `wae.config.ts` leaves `release` unset.
 
 The intended npm release contract is:
 
@@ -106,13 +106,20 @@ The intended npm release contract is:
 
 ### Verified state (2026-11-26)
 
-The release path is **not wired**:
+The name-claim and trust bootstrap is done, the real release path is **not
+wired**:
 
-- `.github/workflows/publish-npm.yml` exists as the Trusted Publisher (OIDC)
-  contract for `@wae/open-ctf*`, but no version tag has been pushed and no npm
-  name is claimed. `wae.config.ts` therefore keeps `release` unset and this
-  repository has no working automated npm release. Do not claim otherwise in a
-  README or a release note.
+- `nifty publish --placeholder` claimed all six publishable names at `0.0.0`
+  (`darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, `win32-x64`,
+  `skills`).
+- `nifty trust` configured the npm Trusted Publisher record for the same six
+  packages against `nyar-os/OpenCTF` / `publish-npm.yml` / `NPM_PUBLISH`, and
+  `nifty trust --dry-run --refresh` reports every record as matching. The
+  `NPM_PUBLISH` environment exists on the repository.
+- No version tag has been pushed, so no real version is published.
+  `wae.config.ts` therefore keeps `release` unset and this repository has no
+  working automated npm release. Do not claim otherwise in a README or a release
+  note.
 - `nifty publish` aborts when a native platform package has no staged `.node`,
   so staging is a hard prerequisite for any future publish job.
 
