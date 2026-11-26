@@ -17,7 +17,7 @@ mod commands;
 mod registry;
 mod webview;
 
-use commands::{binary, elf, macho, pe, scan};
+use commands::{binary, ctf, elf, macho, pe, scan};
 
 /// Library version of the native binding.
 #[function]
@@ -90,6 +90,42 @@ fn binary_tauri_assets(ctx: CallContext) -> Result<JsValue> {
 #[function]
 fn binary_inflate(ctx: CallContext) -> Result<JsValue> {
     scan::binary_inflate(ctx)
+}
+
+/// Identifies the container from magic bytes, described by an options JSON.
+#[function]
+fn binary_probe(ctx: CallContext) -> Result<JsValue> {
+    ctf::binary_probe(ctx)
+}
+
+/// Hashes the whole file or one byte range, described by an options JSON.
+#[function]
+fn binary_hash(ctx: CallContext) -> Result<JsValue> {
+    ctf::binary_hash(ctx)
+}
+
+/// Decodes one byte range with the selected codec, described by an options JSON.
+#[function]
+fn binary_decode(ctx: CallContext) -> Result<JsValue> {
+    ctf::binary_decode(ctx)
+}
+
+/// Cracks or applies a single-byte XOR key, described by an options JSON.
+#[function]
+fn binary_xor(ctx: CallContext) -> Result<JsValue> {
+    ctf::binary_xor(ctx)
+}
+
+/// Scans executable sections for basic x64 gadgets, described by an options JSON.
+#[function]
+fn binary_gadgets(ctx: CallContext) -> Result<JsValue> {
+    ctf::binary_gadgets(ctx)
+}
+
+/// Decodes a JWT header and payload without verifying its signature.
+#[function]
+fn jwt_decode(ctx: CallContext) -> Result<JsValue> {
+    ctf::jwt_decode(ctx)
 }
 
 /// Decodes one `7z`, `asar`, `NSIS` or PyInstaller container, described by an options JSON.
@@ -418,6 +454,12 @@ register_module![
     binary_carve,
     binary_tauri_assets,
     binary_inflate,
+    binary_probe,
+    binary_hash,
+    binary_decode,
+    binary_xor,
+    binary_gadgets,
+    jwt_decode,
     binary_unpack,
     binary_overlay,
     binary_offset_to_va,

@@ -18,6 +18,7 @@ mod carve;
 mod certificates;
 mod code_signature;
 mod debug;
+mod decode;
 mod diff;
 mod disasm;
 mod dump;
@@ -26,7 +27,10 @@ mod elf_symbols;
 mod entropy;
 mod error;
 mod find;
+mod gadgets;
+mod hash;
 mod inflate;
+mod jwt;
 mod load_config;
 mod macho;
 mod mitigations;
@@ -37,6 +41,7 @@ mod pe_bound_imports;
 mod pe_delay_imports;
 mod pe_exception;
 mod pe_rich_header;
+mod probe;
 mod pyc;
 mod pyc_opcodes;
 mod pyinstaller;
@@ -48,6 +53,7 @@ mod text;
 mod tls;
 mod unpack;
 mod version;
+mod xor;
 
 use std::path::{Path, PathBuf};
 
@@ -64,6 +70,7 @@ pub use carve::{CarveOptions, CarveRegion, CarveReport};
 pub use certificates::{CertificatesReport, PeCertificate};
 pub use code_signature::{MachOCodeDirectory, MachOCodeSignatureReport};
 pub use debug::{CodeViewInfo, DebugEntry, DebugReport};
+pub use decode::{DecodeCodec, DecodeOptions, DecodeReport, DecodeStep};
 pub use diff::{DiffRange, DiffReport};
 pub use disasm::{DisassembleOptions, DisassemblyInstruction, DisassemblyReport, DisassemblySyntax};
 pub use dump::{DumpOptions, DumpReport};
@@ -72,7 +79,10 @@ pub use elf_symbols::{ElfStaticSymbol, ElfStaticSymbolsReport};
 pub use entropy::{EntropyReport, OverlayInfo, SectionEntropy};
 pub use error::{CtfError, Result};
 pub use find::{FindHit, FindOptions, FindReport};
+pub use gadgets::{GadgetHit, GadgetOptions, GadgetsReport};
+pub use hash::{HashAlgorithm, HashOptions, HashReport};
 pub use inflate::{InflateFormat, InflateOptions, InflateReport};
+pub use jwt::JwtReport;
 pub use load_config::{CodeIntegrityInfo, PeLoadConfigReport};
 pub use macho::{
     MachOBinding, MachOBindingsReport, MachOChainedFixupsHeader, MachOChainedFixupsReport, MachOChainedImport,
@@ -87,6 +97,7 @@ pub use pe_bound_imports::{PeBoundForwarder, PeBoundImportsReport, PeBoundModule
 pub use pe_delay_imports::{PeDelayImportsReport, PeDelayModule, PeDelayThunk};
 pub use pe_exception::{PeExceptionReport, PeRuntimeFunction, PeUnwindInfo};
 pub use pe_rich_header::{PeRichEntry, PeRichHeaderReport};
+pub use probe::{ProbeFinding, ProbeOptions, ProbeReport};
 pub use pyc::{PycCodeObject, PycConst, PycFormat, PycInstruction, PycOptions, PycReport};
 pub use pyinstaller::{PyInstallerEntry, PyInstallerModule, PyInstallerOptions, PyInstallerReport};
 
@@ -102,6 +113,10 @@ pub use unpack::{
     SevenZEntry, SevenZFolder, SevenZPackRange, SevenZReport, UnpackFormat, UnpackOptions, UnpackReport,
 };
 pub use version::{FixedFileInfo, VersionReport, VersionString};
+pub use xor::{XorKeyGuess, XorOptions, XorReport};
+
+/// Decodes one compact JWT without verifying its signature.
+pub use jwt::decode as decode_jwt;
 
 impl From<data_binary_inspect::InspectError> for CtfError {
     fn from(error: data_binary_inspect::InspectError) -> Self {
@@ -373,6 +388,31 @@ impl BinaryView {
     /// Decodes a CPython marshal stream or pyc container and disassembles it.
     pub fn pyc(&self, options: &PycOptions) -> Result<PycReport> {
         pyc::analyze(&self.session, options)
+    }
+
+    /// Identifies the container from anchored and embedded magic bytes.
+    pub fn probe(&self, options: &ProbeOptions) -> Result<ProbeReport> {
+        probe::analyze(&self.session, options)
+    }
+
+    /// Hashes the whole file or one byte range with the requested algorithm.
+    pub fn hash(&self, options: &HashOptions) -> Result<HashReport> {
+        hash::compute(&self.session, options)
+    }
+
+    /// Decodes one byte range with the selected text or byte codec.
+    pub fn decode(&self, options: &DecodeOptions) -> Result<DecodeReport> {
+        decode::analyze(&self.session, options)
+    }
+
+    /// Cracks or applies a single-byte XOR key over one byte range.
+    pub fn xor(&self, options: &XorOptions) -> Result<XorReport> {
+        xor::analyze(&self.session, options)
+    }
+
+    /// Scans executable sections, or one explicit range, for basic x64 gadgets.
+    pub fn gadgets(&self, options: &GadgetOptions) -> Result<GadgetsReport> {
+        gadgets::analyze(&self.session, options)
     }
 
     /// Searches for a hex, ASCII or UTF-16LE pattern.
@@ -724,6 +764,31 @@ impl OpenCtf {
         pyc::analyze(&self.session, options)
     }
 
+    /// Identifies the container from anchored and embedded magic bytes.
+    pub fn probe(&self, options: &ProbeOptions) -> Result<ProbeReport> {
+        probe::analyze(&self.session, options)
+    }
+
+    /// Hashes the whole file or one byte range with the requested algorithm.
+    pub fn hash(&self, options: &HashOptions) -> Result<HashReport> {
+        hash::compute(&self.session, options)
+    }
+
+    /// Decodes one byte range with the selected text or byte codec.
+    pub fn decode(&self, options: &DecodeOptions) -> Result<DecodeReport> {
+        decode::analyze(&self.session, options)
+    }
+
+    /// Cracks or applies a single-byte XOR key over one byte range.
+    pub fn xor(&self, options: &XorOptions) -> Result<XorReport> {
+        xor::analyze(&self.session, options)
+    }
+
+    /// Scans executable sections, or one explicit range, for basic x64 gadgets.
+    pub fn gadgets(&self, options: &GadgetOptions) -> Result<GadgetsReport> {
+        gadgets::analyze(&self.session, options)
+    }
+
     /// Searches for a hex, ASCII or UTF-16LE pattern.
     pub fn search(&self, options: &SearchOptions) -> Result<SearchReport> {
         self.session.search(options).map_err(CtfError::from)
@@ -775,6 +840,8 @@ pub fn capabilities() -> serde_json::Value {
             "machO": "boost.rs/data-binary-mach-o",
             "sevenZ": "boost.rs/data-binary-sevenz",
             "compression": "boost.rs/data-compression",
+            "probe": "boost.rs/data-binary-probe",
+            "crypto": "boost.rs/boost-crypto",
             "digest": "boost.rs/data-checksum",
         },
         "formats": {
@@ -840,6 +907,12 @@ pub fn capabilities() -> serde_json::Value {
             "tauri-assets": "supported",
             "offset-to-va": "supported",
             "offset-to-rva": "supported",
+            "probe": "supported",
+            "hash": "supported",
+            "decode": "supported",
+            "xor": "supported",
+            "jwt": "supported",
+            "gadgets": "supported",
         },
         "unsupported": {
             "decompilation": "not-implemented",

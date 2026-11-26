@@ -10,10 +10,11 @@ use std::{
 };
 
 use open_ctf_core::{
-    BinaryView, CarveOptions, DisassembleOptions, DisassemblySyntax, DumpOptions, FindOptions, CtfError,
-    InflateFormat, InflateOptions, OpenCtf, OpenCtfOptions, PycFormat, PycOptions, SearchMode,
-    SearchOptions, StringEncoding, StringsOptions, TauriAssetsOptions, UnpackFormat, UnpackOptions, UnpackReport, scan_assets,
-    sniff_pyc,
+    BinaryView, CarveOptions, DecodeCodec, DecodeOptions, DisassembleOptions, DisassemblySyntax, DumpOptions,
+    FindOptions, CtfError, GadgetOptions, HashAlgorithm, HashOptions,
+    InflateFormat, InflateOptions, OpenCtf, OpenCtfOptions, ProbeOptions, PycFormat, PycOptions, SearchMode,
+    SearchOptions, StringEncoding, StringsOptions, TauriAssetsOptions, UnpackFormat, UnpackOptions, UnpackReport, XorOptions,
+    decode_jwt, scan_assets, sniff_pyc,
 };
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -4429,4 +4430,124 @@ fn pyc_options_use_camel_case_defaults() {
     assert_eq!(value["codes"][0]["qualname"], "helper");
     assert_eq!(value["codes"][0]["instructions"][0]["caches"], 4);
     assert_eq!(value["codes"][0]["consts"][0]["repr"], "42");
+}
+
+#[test]
+fn probe_identifies_head_and_embedded_magics() {
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&[0u8; 16]);
+    bytes.extend_from_slice(b"PK\x03\x04");
+    bytes.extend_from_slice(&[0u8; 8]);
+    let view = BinaryView::from_bytes("challenge.png", bytes);
+
+    let report = view.probe(&ProbeOptions::default()).expect("probe");
+    assert_eq!(report.findings[0].format, "png");
+    assert_eq!(report.findings[0].offset, 0);
+    assert!(report.findings.iter().any(|finding| finding.format == "zip" && finding.offset == 24));
+}
+
+#[test]
+fn probe_reports_a_zip_tail_record() {
+    let mut bytes = vec![0u8; 32];
+    bytes.extend_from_slice(b"PK\x05\x06");
+    bytes.extend_from_slice(&[0u8; 18]);
+    let view = BinaryView::from_bytes("appended.bin", bytes);
+
+    let report = view.probe(&ProbeOptions::default()).expect("probe");
+    assert!(report.findings.iter().any(|finding| finding.format == "zip" && finding.offset == 32));
+}
+
+#[test]
+fn hash_matches_known_digests_for_file_and_range() {
+    let file = TempFile::new("hash");
+    file.write(b"abc");
+    let view = BinaryView::open(file.path()).expect("open");
+
+    let sha = view.hash(&HashOptions::default()).expect("sha256");
+    assert_eq!(sha.algorithm, "sha256");
+    assert_eq!(sha.source, "file");
+    assert_eq!(sha.digest, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+    let md5 = view
+        .hash(&HashOptions { algorithm: HashAlgorithm::Md5, offset: Some(0), length: Some(1) })
+        .expect("md5 range");
+    assert_eq!(md5.source, "range");
+    assert_eq!(md5.digest, "0cc175b9c0f1b6a831c399e269772661");
+
+    let sha1 = view.hash(&HashOptions { algorithm: HashAlgorithm::Sha1, ..HashOptions::default() }).expect("sha1");
+    assert_eq!(sha1.digest, "a9993e364706816aba3e25717850c26c9cd0d89d");
+}
+
+#[test]
+fn decode_handles_base64_hex_rot13_and_auto_chains() {
+    let file = TempFile::new("decode");
+    file.write(b"ZmxhZ3t0ZXN0fQ==");
+    let view = BinaryView::open(file.path()).expect("open");
+
+    let explicit = view
+        .decode(&DecodeOptions { codec: DecodeCodec::Base64, ..DecodeOptions::default() })
+        .expect("base64");
+    assert_eq!(explicit.text, "flag{test}");
+
+    let auto = view.decode(&DecodeOptions::default()).expect("auto");
+    assert_eq!(auto.text, "flag{test}");
+    assert!(auto.steps.iter().any(|step| step.codec == "base64"));
+
+    file.write(b"666c6167");
+    let view = BinaryView::open(file.path()).expect("open");
+    let hex = view.decode(&DecodeOptions { codec: DecodeCodec::Hex, ..DecodeOptions::default() }).expect("hex");
+    assert_eq!(hex.text, "flag");
+
+    file.write(b"uryyb");
+    let view = BinaryView::open(file.path()).expect("open");
+    let rot = view.decode(&DecodeOptions { codec: DecodeCodec::Rot13, ..DecodeOptions::default() }).expect("rot13");
+    assert_eq!(rot.text, "hello");
+
+    let error = view
+        .decode(&DecodeOptions { codec: DecodeCodec::Base64, ..DecodeOptions::default() })
+        .unwrap_err();
+    assert_eq!(error.code(), "binary/parse");
+}
+
+#[test]
+fn xor_brute_force_recovers_a_single_byte_key() {
+    let plaintext = b"flag{xor_is_basic}";
+    let encoded: Vec<u8> = plaintext.iter().map(|byte| byte ^ 0x42).collect();
+    let file = TempFile::new("xor");
+    file.write(&encoded);
+    let view = BinaryView::open(file.path()).expect("open");
+
+    let report = view.xor(&XorOptions::default()).expect("brute force");
+    let best = report.guesses.first().expect("at least one guess");
+    assert_eq!(best.key, 0x42);
+    assert!(best.preview.contains("flag{"), "the preview leaks the flag: {}", best.preview);
+
+    let known = view
+        .xor(&XorOptions { key: Some("0x42".into()), ..XorOptions::default() })
+        .expect("known key");
+    assert_eq!(known.plaintext.as_deref(), Some("flag{xor_is_basic}"));
+
+    let bad = view.xor(&XorOptions { key: Some("zz".into()), ..XorOptions::default() }).unwrap_err();
+    assert_eq!(bad.code(), "binary/parse");
+}
+
+#[test]
+fn jwt_decodes_header_payload_and_flags_alg_none() {
+    let token = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJmbGFnIn0.";
+    let report = decode_jwt(token).expect("decode the JWT");
+    assert_eq!(report.algorithm, "none");
+    assert!(report.unsigned);
+    assert_eq!(report.payload["sub"], "flag");
+    assert!(report.warnings.iter().any(|warning| warning.contains("alg=none")));
+    assert!(report.signature_hex.is_empty());
+}
+
+#[test]
+fn gadgets_find_pop_ret_and_syscall_in_code() {
+    let view = BinaryView::from_bytes("gadget.exe", pe_code_bytes(&[0x5f, 0xc3, 0x0f, 0x05, 0xc3]));
+    let report = view.gadgets(&GadgetOptions::default()).expect("gadgets");
+
+    assert!(report.hits.iter().any(|hit| hit.kind == "pop-ret" && hit.text == "pop rdi; ret"));
+    assert!(report.hits.iter().any(|hit| hit.kind == "syscall" && hit.offset == 0x202));
+    assert!(!report.hits.iter().any(|hit| hit.kind == "ret" && hit.offset == 0x201));
 }

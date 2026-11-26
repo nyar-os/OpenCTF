@@ -3,6 +3,7 @@
 //! contract the TypeScript layer expects.
 
 pub(crate) mod binary;
+pub(crate) mod ctf;
 pub(crate) mod elf;
 pub(crate) mod macho;
 pub(crate) mod pe;
