@@ -19,16 +19,16 @@ use data_binary_inspect::{
     SearchOptions, SearchReport, SectionInfo as Section, StringHit, StringsReport, SymbolsReport,
 };
 use open_ctf_formats::{
-    CertificatesReport, DebugReport, DisassembleOptions, DisassemblyReport, ElfDynamicReport, ElfNotesReport,
-    ElfSegmentsReport, ElfStaticSymbolsReport, GadgetOptions, GadgetsReport, InflateOptions, InflateReport,
+    CertificatesReport, DebugReport, DisassembleOptions, DisassemblyReport, EapolOptions, EapolReport, ElfDynamicReport,
+    ElfNotesReport, ElfSegmentsReport, ElfStaticSymbolsReport, GadgetOptions, GadgetsReport, InflateOptions, InflateReport,
     MachOBindingsReport, MachOChainedFixupsReport, MachOCodeSignatureReport, MachOEncryptionReport, MachOExportsReport,
     MachOFunctionStartsReport, MachOReport, MachOSliceExtraction, MachOSlicesReport, MachOSymbolsReport, MitigationsReport,
     OverlayReport, PackerOptions, PackerReport, PcapOptions, PcapReport, PeBoundImportsReport, PeDelayImportsReport,
     PeExceptionReport, PeLoadConfigReport, PeRichHeaderReport, PeTlsReport, PngOptions, PngReport, ProbeOptions, ProbeReport,
     PycOptions, PycReport, RelocationsReport, ResourcesReport, TauriAssetsOptions, TauriAssetsReport, UnpackOptions,
-    UnpackReport, VersionReport, certificates, code_signature, debug, disasm, dynamic, elf_symbols, gadgets, inflate,
-    load_config, macho, mitigations, notes, overlay, packer, pcap, pe_bound_imports, pe_delay_imports, pe_exception,
-    pe_rich_header, png, probe, pyc, relocations, resources, segments, tauri, tls, unpack, version,
+    UnpackReport, VersionReport, WifiOptions, WifiReport, certificates, code_signature, debug, disasm, dynamic, elf_symbols,
+    gadgets, inflate, load_config, macho, mitigations, notes, overlay, packer, pcap, pe_bound_imports, pe_delay_imports,
+    pe_exception, pe_rich_header, png, probe, pyc, relocations, resources, segments, tauri, tls, unpack, version, wifi,
 };
 use open_ctf_solvers::{
     CaesarOptions, CaesarReport, DecodeOptions, DecodeReport, HashOptions, HashReport, XorOptions, XorReport, caesar, decode,
@@ -355,6 +355,16 @@ impl BinaryView {
     /// Summarizes one classic pcap capture.
     pub fn pcap(&self, options: &PcapOptions) -> Result<PcapReport> {
         Ok(pcap::analyze(&self.session, options)?)
+    }
+
+    /// Summarizes one 802.11 capture (pcapng or classic pcap).
+    pub fn wifi(&self, options: &WifiOptions) -> Result<WifiReport> {
+        Ok(wifi::analyze(&self.session, options)?)
+    }
+
+    /// Extracts four-way handshakes and tests candidate WPA2 passphrases.
+    pub fn wifi_handshake(&self, options: &EapolOptions) -> Result<EapolReport> {
+        Ok(wifi::analyze_handshakes(&self.session, options)?)
     }
 
     /// Searches for a hex, ASCII or UTF-16LE pattern.
@@ -748,6 +758,16 @@ impl OpenCtf {
     /// Summarizes one classic pcap capture.
     pub fn pcap(&self, options: &PcapOptions) -> Result<PcapReport> {
         Ok(pcap::analyze(&self.session, options)?)
+    }
+
+    /// Summarizes one 802.11 capture (pcapng or classic pcap).
+    pub fn wifi(&self, options: &WifiOptions) -> Result<WifiReport> {
+        Ok(wifi::analyze(&self.session, options)?)
+    }
+
+    /// Extracts four-way handshakes and tests candidate WPA2 passphrases.
+    pub fn wifi_handshake(&self, options: &EapolOptions) -> Result<EapolReport> {
+        Ok(wifi::analyze_handshakes(&self.session, options)?)
     }
 
     /// Searches for a hex, ASCII or UTF-16LE pattern.

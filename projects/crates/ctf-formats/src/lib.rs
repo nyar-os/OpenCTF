@@ -36,6 +36,7 @@ pub mod pcap;
 pub mod png;
 pub mod probe;
 pub mod unpack;
+pub mod wifi;
 
 pub use owners::*;
 
@@ -78,6 +79,10 @@ pub use tauri::{TauriAsset, TauriAssetsOptions, TauriAssetsReport, scan_assets};
 pub use tls::{PeTlsCallback, PeTlsReport};
 pub use unpack::{SevenZEntry, SevenZFolder, SevenZPackRange, SevenZReport, UnpackFormat, UnpackOptions, UnpackReport};
 pub use version::{FixedFileInfo, VersionReport, VersionString};
+pub use wifi::{
+    CaptureSupport, EapolHandshake, EapolMessage, EapolOptions, EapolReport, WifiFrameType, WifiOptions, WifiReport, WifiSsid,
+    analyze_handshakes, capture_support,
+};
 
 /// Whether a byte window looks like a `marshal` stream or a `.pyc` container.
 pub use pyc::sniff as sniff_pyc;

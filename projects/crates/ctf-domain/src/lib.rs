@@ -53,8 +53,9 @@ pub use open_ctf_formats::scan_assets;
 pub use open_ctf_formats::sniff_pyc;
 pub use open_ctf_formats::{
     AsarEntry, AsarHeader, AsarReport, CertificatesReport, CodeViewInfo, DebugEntry, DebugReport, DisassembleOptions,
-    DisassemblyInstruction, DisassemblyReport, DisassemblySyntax, ElfAbiTag, ElfDynamicReport, ElfGnuProperty, ElfNote,
-    ElfNotesReport, ElfSegment, ElfSegmentsReport, ElfStaticSymbol, ElfStaticSymbolsReport, FixedFileInfo, GadgetHit,
+    DisassemblyInstruction, DisassemblyReport, DisassemblySyntax, EapolHandshake, EapolMessage, EapolOptions, EapolReport,
+    ElfAbiTag, ElfDynamicReport, ElfGnuProperty, ElfNote, ElfNotesReport, ElfSegment, ElfSegmentsReport, ElfStaticSymbol,
+    ElfStaticSymbolsReport, FixedFileInfo, GadgetHit,
     GadgetOptions, GadgetsReport, InflateFormat, InflateOptions, InflateReport, MachOBinding, MachOBindingsReport,
     MachOChainedFixupsHeader, MachOChainedFixupsReport, MachOChainedImport, MachOCodeDirectory, MachOCodeSignatureReport,
     MachODylib, MachOEncryptionReport, MachOExport, MachOExportsReport, MachOFunctionStartsReport, MachOReport, MachOSection,
@@ -67,7 +68,7 @@ pub use open_ctf_formats::{
     PyInstallerReport, PycCodeObject, PycConst, PycFormat, PycInstruction, PycOptions, PycReport, RelocationBlock,
     RelocationKindCount, RelocationsReport, ResourcesReport, SevenZEntry, SevenZFolder, SevenZPackRange, SevenZReport,
     TauriAsset, TauriAssetsOptions, TauriAssetsReport, UnpackFormat, UnpackOptions, UnpackReport, VersionReport, VersionString,
-    WritableExecutableSection,
+    WifiFrameType, WifiOptions, WifiReport, WifiSsid, WritableExecutableSection,
 };
 
 // Solver algorithms re-exported as the product surface.

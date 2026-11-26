@@ -3934,6 +3934,243 @@ fn pcap_summarizes_protocols_and_endpoints() {
 }
 
 #[test]
+fn wifi_decodes_a_radiotap_beacon() {
+    // radiotap: version 0, no present fields, eight-byte header.
+    let radiotap: [u8; 8] = [0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00];
+    let bssid = [0x02u8, 0x11, 0x22, 0x33, 0x44, 0x55];
+    let mut frame = Vec::new();
+    frame.extend_from_slice(&[0x80, 0x00]); // frame control: beacon
+    frame.extend_from_slice(&[0x00, 0x00]); // duration
+    frame.extend_from_slice(&[0xffu8; 6]); // addr1: broadcast
+    frame.extend_from_slice(&bssid); // addr2: transmitter
+    frame.extend_from_slice(&bssid); // addr3: BSSID
+    frame.extend_from_slice(&[0x00, 0x00]); // sequence control
+    frame.extend_from_slice(&[0u8; 8]); // timestamp
+    frame.extend_from_slice(&[0x64, 0x00]); // beacon interval
+    frame.extend_from_slice(&[0x11, 0x00]); // capability (privacy set)
+    frame.extend_from_slice(&[0x00, 0x04, b'T', b'E', b'S', b'T']); // SSID
+    frame.extend_from_slice(&[0x30, 0x02, 0x01, 0x00]); // RSN element
+    frame.extend_from_slice(&[0x03, 0x01, 0x06]); // DS parameter: channel 6
+
+    let mut packet = Vec::new();
+    packet.extend_from_slice(&radiotap);
+    packet.extend_from_slice(&frame);
+
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&[0xd4, 0xc3, 0xb2, 0xa1]); // little-endian, microseconds
+    bytes.extend_from_slice(&2u16.to_le_bytes());
+    bytes.extend_from_slice(&4u16.to_le_bytes());
+    bytes.extend_from_slice(&[0u8; 8]); // thiszone + sigfigs
+    bytes.extend_from_slice(&65535u32.to_le_bytes());
+    bytes.extend_from_slice(&127u32.to_le_bytes()); // link type: radiotap
+    bytes.extend_from_slice(&1u32.to_le_bytes()); // timestamp seconds
+    bytes.extend_from_slice(&0u32.to_le_bytes()); // timestamp fraction
+    bytes.extend_from_slice(&(packet.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&(packet.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&packet);
+
+    let view = BinaryView::from_bytes("beacon.pcap", bytes);
+    let report = view.wifi(&WifiOptions::default()).expect("wifi");
+
+    assert_eq!(report.format, "pcap");
+    assert_eq!(report.link, "radiotap");
+    assert_eq!(report.frames, 1);
+    assert!(!report.capture.live);
+    assert!(report.frame_types.iter().any(|entry| entry.label == "beacon" && entry.count == 1));
+    let ssid = report.ssids.iter().find(|entry| entry.ssid == "TEST").expect("ssid");
+    assert_eq!(ssid.bssid, "02:11:22:33:44:55");
+    assert_eq!(ssid.channel, Some(6));
+    assert!(ssid.security.contains("WPA2"));
+}
+
+#[test]
+fn wifi_rejects_a_non_80211_link() {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&[0xd4, 0xc3, 0xb2, 0xa1]);
+    bytes.extend_from_slice(&2u16.to_le_bytes());
+    bytes.extend_from_slice(&4u16.to_le_bytes());
+    bytes.extend_from_slice(&[0u8; 8]);
+    bytes.extend_from_slice(&65535u32.to_le_bytes());
+    bytes.extend_from_slice(&1u32.to_le_bytes()); // link type: ethernet
+
+    let view = BinaryView::from_bytes("wired.pcap", bytes);
+    assert!(view.wifi(&WifiOptions::default()).is_err());
+}
+
+/// Synthetic handshake values computed independently from SSID `OpenCTF-TEST`
+/// and passphrase `testpass123`; no customer material is involved.
+const HANDSHAKE_SSID: &str = "OpenCTF-TEST";
+const HANDSHAKE_MIC: [u8; 16] =
+    [0x9f, 0x86, 0x04, 0x74, 0x6e, 0xe2, 0xc5, 0x1d, 0x53, 0x7a, 0xb1, 0x54, 0x38, 0x86, 0x3e, 0x04];
+
+fn eapol_key(nonce: &[u8; 32], key_info: u16, mic: &[u8; 16]) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.push(2u8); // descriptor: RSN
+    body.extend_from_slice(&key_info.to_be_bytes());
+    body.extend_from_slice(&16u16.to_be_bytes());
+    body.extend_from_slice(&1u64.to_be_bytes());
+    body.extend_from_slice(nonce);
+    body.extend_from_slice(&[0u8; 16]);
+    body.extend_from_slice(&[0u8; 8]);
+    body.extend_from_slice(&[0u8; 8]);
+    body.extend_from_slice(mic);
+    body.extend_from_slice(&0u16.to_be_bytes());
+    let mut frame = Vec::new();
+    frame.extend_from_slice(&[2u8, 3]);
+    frame.extend_from_slice(&(body.len() as u16).to_be_bytes());
+    frame.extend_from_slice(&body);
+    frame
+}
+
+fn ethernet_frame(dst: &[u8; 6], src: &[u8; 6], payload: &[u8]) -> Vec<u8> {
+    let mut frame = Vec::new();
+    frame.extend_from_slice(dst);
+    frame.extend_from_slice(src);
+    frame.extend_from_slice(&0x888eu16.to_be_bytes());
+    frame.extend_from_slice(payload);
+    frame
+}
+
+fn data_frame(control: u16, addr1: &[u8; 6], addr2: &[u8; 6], addr3: &[u8; 6], payload: &[u8]) -> Vec<u8> {
+    let mut frame = Vec::new();
+    frame.extend_from_slice(&control.to_le_bytes());
+    frame.extend_from_slice(&[0u8, 0u8]);
+    frame.extend_from_slice(addr1);
+    frame.extend_from_slice(addr2);
+    frame.extend_from_slice(addr3);
+    frame.extend_from_slice(&[0u8, 0u8]);
+    frame.extend_from_slice(&[0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00]);
+    frame.extend_from_slice(&0x888eu16.to_be_bytes());
+    frame.extend_from_slice(payload);
+    frame
+}
+
+fn beacon_frame(bssid: &[u8; 6], ssid: &[u8]) -> Vec<u8> {
+    let mut frame = Vec::new();
+    frame.extend_from_slice(&[0x80, 0x00]);
+    frame.extend_from_slice(&[0x00, 0x00]);
+    frame.extend_from_slice(&[0xffu8; 6]);
+    frame.extend_from_slice(bssid);
+    frame.extend_from_slice(bssid);
+    frame.extend_from_slice(&[0x00, 0x00]);
+    frame.extend_from_slice(&[0u8; 8]);
+    frame.extend_from_slice(&[0x64, 0x00]);
+    frame.extend_from_slice(&[0x11, 0x00]);
+    frame.push(0);
+    frame.push(ssid.len() as u8);
+    frame.extend_from_slice(ssid);
+    frame.extend_from_slice(&[0x30, 0x02, 0x01, 0x00]);
+    frame
+}
+
+fn pcap_capture(link_type: u32, frames: &[Vec<u8>]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&[0xd4, 0xc3, 0xb2, 0xa1]);
+    bytes.extend_from_slice(&2u16.to_le_bytes());
+    bytes.extend_from_slice(&4u16.to_le_bytes());
+    bytes.extend_from_slice(&[0u8; 8]);
+    bytes.extend_from_slice(&65535u32.to_le_bytes());
+    bytes.extend_from_slice(&link_type.to_le_bytes());
+    for (index, frame) in frames.iter().enumerate() {
+        bytes.extend_from_slice(&((index as u32) + 1).to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&(frame.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&(frame.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(frame);
+    }
+    bytes
+}
+
+#[test]
+fn wifi_handshake_verifies_a_synthetic_ethernet_handshake() {
+    let ap = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x01];
+    let station = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x02];
+    let anonce: [u8; 32] = std::array::from_fn(|index| (index + 1) as u8);
+    let snonce: [u8; 32] = std::array::from_fn(|index| (index + 33) as u8);
+    let m1 = eapol_key(&anonce, 0x008a, &[0u8; 16]);
+    let m2 = eapol_key(&snonce, 0x010a, &HANDSHAKE_MIC);
+    let bytes = pcap_capture(1, &[ethernet_frame(&station, &ap, &m1), ethernet_frame(&ap, &station, &m2)]);
+
+    let view = BinaryView::from_bytes("handshake.pcap", bytes);
+    let options = EapolOptions {
+        ssid: Some(HANDSHAKE_SSID.to_string()),
+        passphrases: vec!["wrong".to_string(), "testpass123".to_string()],
+        ..EapolOptions::default()
+    };
+    let report = view.wifi_handshake(&options).expect("handshake");
+
+    assert_eq!(report.format, "pcap");
+    assert_eq!(report.link, "ethernet");
+    assert_eq!(report.frames, 2);
+    assert_eq!(report.eapol_frames, 2);
+    assert_eq!(report.handshakes.len(), 1);
+    let handshake = &report.handshakes[0];
+    assert_eq!(handshake.bssid, "02:00:00:00:00:01");
+    assert_eq!(handshake.station, "02:00:00:00:00:02");
+    assert_eq!(handshake.ssid.as_deref(), Some(HANDSHAKE_SSID));
+    assert!(handshake.complete);
+    assert!(handshake.mic_verified);
+    assert_eq!(handshake.passphrase.as_deref(), Some("testpass123"));
+    assert_eq!(handshake.checked, 2);
+    assert_eq!(report.passphrases_checked, 2);
+}
+
+#[test]
+fn wifi_handshake_leaves_a_wrong_passphrase_unverified() {
+    let ap = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x01];
+    let station = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x02];
+    let anonce: [u8; 32] = std::array::from_fn(|index| (index + 1) as u8);
+    let snonce: [u8; 32] = std::array::from_fn(|index| (index + 33) as u8);
+    let m1 = eapol_key(&anonce, 0x008a, &[0u8; 16]);
+    let m2 = eapol_key(&snonce, 0x010a, &HANDSHAKE_MIC);
+    let bytes = pcap_capture(1, &[ethernet_frame(&station, &ap, &m1), ethernet_frame(&ap, &station, &m2)]);
+
+    let view = BinaryView::from_bytes("handshake.pcap", bytes);
+    let options = EapolOptions {
+        ssid: Some(HANDSHAKE_SSID.to_string()),
+        passphrases: vec!["admin".to_string()],
+        ..EapolOptions::default()
+    };
+    let report = view.wifi_handshake(&options).expect("handshake");
+    let handshake = &report.handshakes[0];
+    assert!(handshake.complete);
+    assert!(!handshake.mic_verified);
+    assert!(handshake.passphrase.is_none());
+    assert_eq!(handshake.checked, 1);
+}
+
+#[test]
+fn wifi_handshake_reads_radiotap_and_infers_the_ssid() {
+    let ap = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x01];
+    let station = [0x02u8, 0x00, 0x00, 0x00, 0x00, 0x02];
+    let anonce: [u8; 32] = std::array::from_fn(|index| (index + 1) as u8);
+    let snonce: [u8; 32] = std::array::from_fn(|index| (index + 33) as u8);
+    let m1 = eapol_key(&anonce, 0x008a, &[0u8; 16]);
+    let m2 = eapol_key(&snonce, 0x010a, &HANDSHAKE_MIC);
+    let radiotap: [u8; 8] = [0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00];
+    let mut frames = Vec::new();
+    for frame in [
+        beacon_frame(&ap, HANDSHAKE_SSID.as_bytes()),
+        data_frame(0x0208, &station, &ap, &ap, &m1),
+        data_frame(0x0108, &ap, &station, &station, &m2),
+    ] {
+        let mut packet = Vec::new();
+        packet.extend_from_slice(&radiotap);
+        packet.extend_from_slice(&frame);
+        frames.push(packet);
+    }
+
+    let view = BinaryView::from_bytes("handshake.pcap", pcap_capture(127, &frames));
+    let report = view.wifi_handshake(&EapolOptions::default()).expect("handshake");
+    let handshake = report.handshakes.first().expect("handshake");
+    assert_eq!(report.link, "radiotap");
+    assert_eq!(handshake.ssid.as_deref(), Some(HANDSHAKE_SSID));
+    assert!(handshake.complete);
+    assert!(!handshake.mic_verified);
+    assert_eq!(handshake.checked, 0);
+}
+
+#[test]
 fn opcode_tables_are_sorted_and_unique() {
     assert_eq!(pyc_opcodes::SUPPORTED_VERSIONS, [311, 312, 313]);
     for version in pyc_opcodes::SUPPORTED_VERSIONS {
