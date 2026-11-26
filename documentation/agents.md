@@ -17,8 +17,8 @@ the only support claim that counts.
 |-----------------------------|---------------------------------------------------------------------|-------|
 | `ctf-domain` (`open-ctf-domain`) | `Challenge`, `Candidate`/`CandidateSet`, `Evidence`, `ChallengeReport`, `CtfError`, the `OpenCtf`/`BinaryView` session, the byte-observation projections over the pinned `data-binary-inspect`, and `workflow/{identify,triage,solve,verify}` | `tests/{challenge,candidate,workflow}.rs` |
 | `ctf-solvers` (`open-ctf-solvers`) | Caesar, XOR, cyclic, decoders, digests, JWT, URL                | `tests/{algorithms,fixtures}.rs` |
-| `ctf-formats` (`open-ctf-formats`) | `owners.rs` projections over the pinned Boost PE/ELF/Mach-O/container owners, plus product-local pcap, png, packer, overlay, unpack, gadgets, disasm, probe and inflate | `tests/projections.rs` |
-| `ctf-napi` (`open-ctf-napi`) | JSON-in/JSON-out exports, the handle table, the WebView host       | no tests; the surface is asserted through the CLI/SDK |
+| `ctf-formats` (`open-ctf-formats`) | `owners.rs` projections over the pinned Boost PE/ELF/Mach-O/container owners, plus product-local pcap, png, packer, overlay, unpack, gadgets, disasm, probe and inflate. `png` calls `data-checksum` for CRC and `data-compression` for zlib; `overlay` calls `data-binary-inspect::entropy`; `probe` calls `data-binary-probe` for anchored signatures | `tests/projections.rs` |
+| `ctf-napi` (`open-ctf-napi`) | JSON-in/JSON-out exports, the private camelCase wire projection and candidate DTO, the handle table and the WebView host | `tests/candidates.rs` for the DTO; every other route is asserted through the CLI/SDK |
 
 Rules an agent must not break:
 
@@ -36,6 +36,22 @@ Rules an agent must not break:
   modules live only in `ctf-formats/src/owners.rs` as session → owner → report
   projections; do not add a second parser there. A module may stay product-local
   only with a recorded reason in the table.
+- `pcap` and `packer` stay product-local. `png` keeps only its chunk walk,
+  text policy and trailing-data policy; CRC-32 uses `data-checksum` and zlib
+  uses `data-compression`. The walker is removed when the shared image owner
+  exposes the same chunk, CRC and pixel facts. `overlay` must keep calling the
+  shared entropy owner and may not grow its own entropy loop again.
+- Cross-repository capabilities come from `boost.rs` through git dependencies
+  pinned with `rev` in the workspace manifest. Never add a path dependency to a
+  sibling checkout, and never add a branch or tag dependency.
+- Only private Node-API DTOs may use Serde `camelCase`; no domain, format or
+  solver type carries that attribute. `ctf-napi/src/dto.rs` owns the boundary:
+  `request` maps JavaScript `camelCase` option keys to `snake_case` before
+  deserialising, and `to_wire` restores the frozen `camelCase` keys recursively
+  on output while leaving enum values, paths and the free-form JWT
+  header/payload untouched. The candidate DTO is the explicit per-shape example
+  and freezes `items` with `source`, `label`, `value`, `score` and the enum
+  values `xor`/`caesar`; an unknown solver is `binary/unsupported`.
 - The six byte-observation projections in `ctf-domain` (`diff`, `find`, `text`,
   `dump`, `entropy`, `carve`) must not grow a local scanner again. Call the
   pinned `data-binary-inspect` revision recorded in `duplication.md`; only
@@ -52,20 +68,23 @@ The matrix in `capabilities()` is the support claim; ownership is separate:
 - **migrated** — read from the pinned Boost owner, no copy here. `diff`, `find`,
   `text`, `dump`, `entropy` and `carve` are here: their options, paging and
   report shape stay product-side, but the byte observation calls
-  `data-binary-inspect`; `inflate` and `png` call `data-compression`. All are
-  pinned at `3e865d5c`. The DEFLATE/Brotli decoders of NSIS, PyInstaller and
-  Tauri now live inside `data-binary-container`, and `miniz_oxide` and the
-  third-party `brotli` crate are no longer dependencies. In `ctf-formats`,
-  `owners.rs` projects `data-binary-pe`, `data-binary-mach-o` and
-  `data-binary-container`; there is no local PE/ELF/Mach-O/pyc/NSIS/asar/Tauri
-  parser. `disasm` calls `data-binary-x64::decode` (behind the `decode`
-  feature) and `probe` uses `data-binary-probe`. `iced-x86` was deleted from the
+  `data-binary-inspect`; `inflate` and `png` call `data-compression`, and PNG
+  chunk CRC-32 calls `data-checksum`; overlay entropy calls
+  `data-binary-inspect::entropy`. The DEFLATE/Brotli decoders of NSIS,
+  PyInstaller and Tauri now live inside `data-binary-container`, and
+  `miniz_oxide` and the third-party `brotli` crate are no longer dependencies.
+  In `ctf-formats`, `owners.rs` projects `data-binary-pe`,
+  `data-binary-mach-o` and `data-binary-container`; there is no local
+  PE/ELF/Mach-O/pyc/NSIS/asar/Tauri parser. `disasm` calls
+  `data-binary-x64::decode` (behind the `decode` feature) and `probe` uses
+  `data-binary-probe` for anchored signatures. `iced-x86` was deleted from the
   manifests and `Cargo.lock`, so `cargo tree -e normal,build,dev -i iced-x86`
   is empty.
-- **product-local** — no owner today; the byte policy stays in `ctf-formats`.
+- **product-local** — no full owner today; the policy stays in `ctf-formats`.
   The nine product-local modules (`pcap`, `png`, `packer`, `overlay`, `unpack`,
   `gadgets`, `disasm`, `probe`, `inflate`) are listed with their reasons in
-  `documentation/duplication.md`.
+  `documentation/duplication.md`. Their compression, checksum, entropy and
+  anchored-signature steps still call the owners above.
 
 A product-local capability is still a truthful answer: never call it
 unsupported, and never claim it is migrated.
@@ -76,6 +95,19 @@ and `ctf-domain/src/error.rs` converts it once into `CtfError`. `find` keeps a
 byte-regex matcher for patterns the owner cannot express as literals; plain
 literal patterns call `find::find`.
 
+
+## Test layers
+
+| Layer | Location | Owns |
+|-------|----------|------|
+| Format facts | `ctf-formats/tests/projections.rs` | Inline fixtures for PE/ELF/Mach-O/container/image/capture facts, PNG chunk/CRC/text/trailing behaviour, DEFLATE truncation/checksum/limit paths and container failure paths |
+| Solver algorithms | `ctf-solvers/tests/{algorithms,fixtures}.rs` | Ranking, previews, failure codes, fixed digest vectors |
+| Product workflow | `ctf-domain/tests/{challenge,candidate,workflow}.rs` | Classification, ranking, report keys, session defaults, solve/verify |
+| Binding DTO | `ctf-napi/tests/candidates.rs` | Request defaults, response key names, enum values and rejection of an unknown solver source |
+
+Fixtures are constructed in memory or recorded as fixed hex bytes with an
+independent expectation; never take the output of the code under test as the
+expected value.
 
 ## Capability discovery
 

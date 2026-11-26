@@ -7,13 +7,10 @@ opens, the owner reads the bytes and the report shape is projected back.
 `src/owners.rs` is the only file that carries those projections; it contains no
 format constant, offset or opcode table.
 
-Pinned upstream revision: `3e865d5c`
-(`✨ data-binary-pe / data-binary-mach-o / data-binary-container fact readers`).
-Every `git` dependency in `Cargo.toml` points at that revision,
+Every `git` dependency in `Cargo.toml` is pinned with `rev`;
 `data-compression` is consumed with the `deflate` and `brotli` features,
 `data-binary-x64` with `default-features = false, features = ["decode"]`, and
-`data-binary-container` is a new workspace dependency. `Cargo.lock` records the
-same commit.
+`data-checksum` supplies CRC-32. `Cargo.lock` records the same revision.
 
 Decision values:
 
@@ -129,9 +126,9 @@ root, so the test surface did not change.
 | Path              | Reason |
 |-------------------|--------|
 | `src/pcap.rs`     | No `data-binary-pcap` owner. Frame, endpoint and protocol projection is CTF policy over the session bytes. |
-| `src/png.rs`      | No `data-binary-png` owner. Chunk walk, CRC classification, `IEND` trailing data and pixel preview are product facts; `zTXt`/`iTXt` still call `data-compression`. |
-| `src/packer.rs`   | Packer signature table, confidence tiers and PE corroboration are product policy; the shared byte signatures come from `data-binary-probe`. |
-| `src/overlay.rs`  | Overlay/last-section heuristic and the overlay signature list are CTF policy; only the Shannon helper stays product-side. |
+| `src/png.rs`      | The `data-binary-png` walker is not available yet; chunk order, text policy and `IEND` trailing data stay product-side. Chunk CRC-32 calls `data-checksum` and `zTXt`/`iTXt` call `data-compression`. |
+| `src/packer.rs`   | Packer section names, marker table, confidence tiers and PE corroboration are product policy; no shared owner exposes the same confidence contract. |
+| `src/overlay.rs`  | Overlay/last-section heuristic and the overlay signature list are CTF policy; Shannon entropy calls `data-binary-inspect::entropy` and only the rounding stays product-side. |
 | `src/unpack.rs`   | Format sniff and extraction policy; the 7z index/decode is `data-binary-sevenz` and the other containers are the owner projections above. |
 | `src/gadgets.rs`  | ROP gadget selection and ranking are CTF policy; instruction decoding is `data-binary-x64::decode`. |
 | `src/disasm.rs`   | PE address mapping, count policy, syntax switch and stop-on-invalid rule are product policy; `data-binary-x64::decode` owns the instruction decode. |
@@ -141,13 +138,15 @@ root, so the test surface did not change.
 
 ## Compression status
 
-`inflate` and `png` still call `data-compression` directly because their
-envelope selection, gzip-member handling and PNG chunk policy are product-side.
-The NSIS, PyInstaller and Tauri decoders moved into `data-binary-container` with
-the rest of their containers, so those call sites no longer exist in this repo.
-`miniz_oxide` and the third-party `brotli` crate remain absent from the
-dependency graph; `data-encoding` remains transitive and is reached through
-`boost-crypto` for standard hex/base64 conversions.
+`inflate` and `png` call `data-compression` directly because their envelope
+selection, gzip-member handling and PNG chunk policy are product-side. PNG
+chunk CRC-32 is read from `data-checksum`; the mismatch is reported as a fact
+and does not change the walk failure semantics. The NSIS, PyInstaller and Tauri
+decoders moved into `data-binary-container` with the rest of their containers,
+so those call sites no longer exist in this repo. `miniz_oxide` and the
+third-party `brotli` crate remain absent from the dependency graph;
+`data-encoding` remains transitive and is reached through `boost-crypto` for
+standard hex/base64 conversions.
 
 ## Deleted dependencies
 
@@ -160,8 +159,8 @@ dependency graph; `data-encoding` remains transitive and is reached through
 ## Remaining upstream work
 
 1. `pcap` frame/endpoint facts → a `data-binary-pcap` owner.
-2. `png` chunk/CRC/pixel facts → a `data-binary-png` owner; the DEFLATE call
-   already uses `data-compression`.
+2. `png` chunk structure, text policy and pixel preview → a shared image owner;
+   the chunk CRC-32 and DEFLATE calls already use their owners.
 3. `packer` signature confidence → a `data-binary-probe` + `data-binary-pe`
    owner for the corroboration tier.
 
@@ -175,6 +174,5 @@ local policy.
   equivalent; the algorithms are CTF-specific.
 - The session itself (open, header, sections, strings, search, hex dump, read,
   patch, address mapping) is `boost.rs/data-binary-inspect` and is never copied.
-- `ctf-formats::overlay::shannon` remains the one product-side entropy helper
-  used by the overlay projection; `ctf-domain::entropy` calls the owner and only
-  rounds its result.
+- `ctf-formats::overlay::shannon` only rounds the result of
+  `data-binary-inspect::entropy::shannon`; it no longer counts bytes locally.
