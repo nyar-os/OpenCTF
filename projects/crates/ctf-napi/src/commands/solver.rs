@@ -16,37 +16,46 @@ use crate::{
 };
 
 fn hash_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<HashOptions>(options_json)
+    let options = crate::dto::request::<HashOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid HashOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.hash(&options)?))
 }
 
 fn decode_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<DecodeOptions>(options_json)
+    let options = crate::dto::request::<DecodeOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid DecodeOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.decode(&options)?))
 }
 
 fn xor_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<XorOptions>(options_json)
+    let options = crate::dto::request::<XorOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid XorOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.xor(&options)?))
 }
 
 fn gadgets_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<GadgetOptions>(options_json)
+    let options = crate::dto::request::<GadgetOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid GadgetOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.gadgets(&options)?))
 }
 
 fn caesar_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<CaesarOptions>(options_json)
+    let options = crate::dto::request::<CaesarOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid CaesarOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.caesar(&options)?))
 }
 
 pub(crate) fn jwt_report(token: &str) -> std::result::Result<Value, CtfError> {
-    encoded(&decode_jwt(token)?)
+    let report = decode_jwt(token)?;
+    // The header and payload are caller data: their keys are never rewritten.
+    Ok(serde_json::json!({
+        "header": report.header,
+        "payload": report.payload,
+        "algorithm": report.algorithm,
+        "unsigned": report.unsigned,
+        "signatureHex": report.signature_hex,
+        "warnings": report.warnings,
+    }))
 }
 
 pub(crate) fn url_report(input: &str) -> std::result::Result<Value, CtfError> {
@@ -54,7 +63,7 @@ pub(crate) fn url_report(input: &str) -> std::result::Result<Value, CtfError> {
 }
 
 pub(crate) fn cyclic_report(options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<CyclicOptions>(options_json)
+    let options = crate::dto::request::<CyclicOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid CyclicOptions: {error}")))?;
     encoded(&cyclic(&options)?)
 }

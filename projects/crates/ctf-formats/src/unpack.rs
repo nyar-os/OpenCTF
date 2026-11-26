@@ -78,7 +78,7 @@ pub enum UnpackFormat {
 
 /// Inputs of one `OpenCtf::unpack` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct UnpackOptions {
     /// Container format; `auto` sniffs the bytes.
     #[serde(default)]
@@ -120,7 +120,6 @@ impl Default for UnpackOptions {
 
 /// One packed `7z` folder range inside the container.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SevenZPackRange {
     /// Absolute offset of the pack stream inside the file.
     pub start: u64,
@@ -130,7 +129,6 @@ pub struct SevenZPackRange {
 
 /// One packed `7z` folder: a coder chain feeding the entry sub-streams.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SevenZFolder {
     /// Zero-based folder index.
     pub index: usize,
@@ -148,7 +146,6 @@ pub struct SevenZFolder {
 
 /// One `7z` archive entry (file or directory).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SevenZEntry {
     /// Zero-based entry index.
     pub index: usize,
@@ -174,7 +171,6 @@ pub struct SevenZEntry {
 
 /// Facts indexed from one `7z` container header.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SevenZReport {
     /// Absolute offset of the signature header.
     pub start_offset: u64,

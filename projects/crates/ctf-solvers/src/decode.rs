@@ -79,7 +79,7 @@ impl DecodeCodec {
 
 /// Inputs of one `OpenCtf::decode` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct DecodeOptions {
     /// Decoder to apply; `auto` chains them.
     #[serde(default)]
@@ -103,7 +103,6 @@ impl Default for DecodeOptions {
 
 /// One applied decoder with its byte counts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DecodeStep {
     /// Decoder that produced this step.
     pub codec: String,
@@ -115,7 +114,6 @@ pub struct DecodeStep {
 
 /// Result of one `OpenCtf::decode` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DecodeReport {
     /// Decoders applied, in order.
     pub steps: Vec<DecodeStep>,

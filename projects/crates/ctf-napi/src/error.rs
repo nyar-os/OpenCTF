@@ -53,7 +53,7 @@ pub(crate) fn respond<T: Serialize>(ctx: &CallContext, value: &T) -> Result<JsVa
 }
 
 pub(crate) fn encoded<T: Serialize>(value: &T) -> std::result::Result<Value, CtfError> {
-    serde_json::to_value(value).map_err(|error| CtfError::parse(error.to_string()))
+    crate::dto::to_wire(value)
 }
 
 pub(crate) fn limit_value(limit: Option<u64>) -> Option<usize> {

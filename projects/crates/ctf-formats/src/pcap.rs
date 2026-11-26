@@ -35,7 +35,7 @@ const MAX_ENDPOINTS: usize = 32;
 
 /// Inputs of one `OpenCtf::pcap` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct PcapOptions {
     /// File offset of the pcap magic; defaults to zero.
     #[serde(default)]
@@ -53,7 +53,6 @@ impl Default for PcapOptions {
 
 /// One protocol counter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PcapProtocol {
     /// Protocol label, such as `tcp` or `ethertype-0806`.
     pub name: String,
@@ -63,7 +62,6 @@ pub struct PcapProtocol {
 
 /// One endpoint counter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PcapEndpoint {
     /// `address:port` seen as a TCP or UDP sender or receiver.
     pub address: String,
@@ -73,7 +71,6 @@ pub struct PcapEndpoint {
 
 /// Result of one pcap summary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PcapReport {
     /// Capture format; always `pcap`.
     pub format: String,

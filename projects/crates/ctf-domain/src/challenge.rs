@@ -415,7 +415,6 @@ fn default_hexdump_length() -> u64 {
 /// Serialized as JSON with camelCase keys, so `{ "path": "...", "minStringLen": 4 }`
 /// is the wire form the addon and the TypeScript client both use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OpenCtfOptions {
     /// Binary to open.
     pub path: PathBuf,
@@ -798,7 +797,6 @@ impl OpenCtf {
 /// [`OpenCtf`] session, and every interpretation is recorded as evidence or a
 /// candidate so the report can separate facts from guesses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Challenge {
     /// File name of the opened artifact.
     pub name: String,

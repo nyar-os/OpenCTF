@@ -57,7 +57,6 @@ impl InflateFormat {
 
 /// Inputs of one `OpenCtf::inflate` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InflateOptions {
     /// File offset of the first compressed byte.
     pub offset: u64,
@@ -74,7 +73,6 @@ pub struct InflateOptions {
 
 /// Result of one `OpenCtf::inflate` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct InflateReport {
     /// File offset the decode started at.
     pub offset: u64,

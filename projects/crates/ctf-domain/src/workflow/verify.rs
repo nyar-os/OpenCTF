@@ -30,7 +30,6 @@ impl VerifyRule {
 
 /// One verified candidate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Verdict {
     /// The candidate that was checked.
     pub candidate: Candidate,

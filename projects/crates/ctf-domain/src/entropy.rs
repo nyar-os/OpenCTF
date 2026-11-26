@@ -12,7 +12,6 @@ use crate::Result;
 
 /// Entropy of one section payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SectionEntropy {
     /// Section name as stored in the container.
     pub name: String,
@@ -26,7 +25,6 @@ pub struct SectionEntropy {
 
 /// Bytes that follow the last section payload of a `PE` file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OverlayInfo {
     /// File offset where the overlay starts.
     pub offset: u64,
@@ -36,7 +34,6 @@ pub struct OverlayInfo {
 
 /// Entropy summary of one binary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EntropyReport {
     /// File size in bytes.
     pub file_size: u64,

@@ -85,7 +85,6 @@ pub mod debug {
 
     /// One `CodeView` record carried by a debug directory entry.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct CodeViewInfo {
         /// Record magic: `RSDS` or `NB10`.
         pub signature: String,
@@ -103,7 +102,6 @@ pub mod debug {
 
     /// One `IMAGE_DEBUG_DIRECTORY` entry.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct DebugEntry {
         /// Debug type such as `codeview`, `fpo` or `pogo`.
         pub debug_type: String,
@@ -125,7 +123,6 @@ pub mod debug {
 
     /// Bounded listing of [`DebugEntry`] values.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct DebugReport {
         /// Entries that survived the limit.
         pub entries: Vec<DebugEntry>,
@@ -376,7 +373,6 @@ pub mod dynamic {
 
     /// Dynamic linking facts of one ELF image.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfDynamicReport {
         /// Whether a `PT_DYNAMIC` segment exists.
         pub present: bool,
@@ -427,7 +423,6 @@ pub mod segments {
 
     /// One program header entry.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfSegment {
         /// Index in the program header table.
         pub index: usize,
@@ -455,7 +450,6 @@ pub mod segments {
 
     /// ELF program header table summary.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfSegmentsReport {
         /// Whether the table contains at least one entry.
         pub present: bool,
@@ -513,7 +507,6 @@ pub mod notes {
 
     /// Decoded `NT_GNU_ABI_TAG` description.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfAbiTag {
         /// Target operating system recorded by the tag.
         pub os: String,
@@ -527,7 +520,6 @@ pub mod notes {
 
     /// One entry of a `NT_GNU_PROPERTY_TYPE_0` note.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfGnuProperty {
         /// Stable property name, or `0x<type>` for an unknown value.
         pub property_type: String,
@@ -539,7 +531,6 @@ pub mod notes {
 
     /// One note record.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfNote {
         /// Note owner without its NUL terminator, such as `GNU`.
         pub owner: String,
@@ -554,7 +545,6 @@ pub mod notes {
 
     /// ELF note facts of one image.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfNotesReport {
         /// Whether at least one note region exists.
         pub present: bool,
@@ -633,7 +623,6 @@ pub mod elf_symbols {
 
     /// One `.symtab` entry.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfStaticSymbol {
         /// Name read from the linked string table, empty for the null symbol.
         pub name: String,
@@ -653,7 +642,6 @@ pub mod elf_symbols {
 
     /// Bounded ELF static symbol listing.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ElfStaticSymbolsReport {
         /// Whether the image has a `SHT_SYMTAB` section.
         pub present: bool,
@@ -769,7 +757,6 @@ pub mod macho {
 
     /// One linked or identifying dylib command.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachODylib {
         /// Command kind: `load`, `id`, `weak`, `reexport`, `lazy` or `upward`.
         pub kind: String,
@@ -785,7 +772,6 @@ pub mod macho {
 
     /// One segment load command.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSegment {
         /// Segment name, such as `__TEXT`.
         pub name: String,
@@ -807,7 +793,6 @@ pub mod macho {
 
     /// One section entry with its owning segment.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSection {
         /// Owning segment name.
         pub segment: String,
@@ -833,7 +818,6 @@ pub mod macho {
 
     /// Full Mach-O image summary.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOReport {
         /// Whether the file uses the 64-bit header layout.
         pub is_64: bool,
@@ -877,7 +861,6 @@ pub mod macho {
 
     /// One `nlist` entry of the `LC_SYMTAB` symbol table.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSymbol {
         /// Name resolved through the string table; empty when the index is out of range.
         pub name: String,
@@ -897,7 +880,6 @@ pub mod macho {
 
     /// Bounded listing of [`MachOSymbol`] values from `LC_SYMTAB`.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSymbolsReport {
         /// Symbols that survived the limit.
         pub symbols: Vec<MachOSymbol>,
@@ -911,7 +893,6 @@ pub mod macho {
 
     /// One symbol decoded from the dyld export trie.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOExport {
         /// Accumulated symbol name.
         pub name: String,
@@ -927,7 +908,6 @@ pub mod macho {
 
     /// Bounded listing of symbols from the dyld export trie.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOExportsReport {
         /// Whether the image carries an export trie.
         pub present: bool,
@@ -941,7 +921,6 @@ pub mod macho {
 
     /// Mach-O encryption information.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOEncryptionReport {
         /// Whether the image carries an encryption info load command.
         pub present: bool,
@@ -959,7 +938,6 @@ pub mod macho {
 
     /// One decoded `CodeDirectory` blob.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOCodeDirectory {
         /// Blob format version, such as `0x20200`.
         pub version: u32,
@@ -987,7 +965,6 @@ pub mod macho {
 
     /// Embedded signature summary.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOCodeSignatureReport {
         /// Whether the image has an `LC_CODE_SIGNATURE` command.
         pub present: bool,
@@ -1009,7 +986,6 @@ pub mod macho {
 
     /// One architecture slice of a fat/universal Mach-O.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSlice {
         /// Zero-based position in the fat architecture table.
         pub index: usize,
@@ -1031,7 +1007,6 @@ pub mod macho {
 
     /// Fat/universal Mach-O architecture table.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSlicesReport {
         /// Whether the fat header uses the 64-bit `fat_arch_64` layout.
         pub is_fat64: bool,
@@ -1041,7 +1016,6 @@ pub mod macho {
 
     /// One fat slice written to a caller-chosen path.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOSliceExtraction {
         /// Zero-based position in the fat architecture table.
         pub index: usize,
@@ -1057,7 +1031,6 @@ pub mod macho {
 
     /// One import entry of the `LC_DYLD_CHAINED_FIXUPS` table.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOChainedImport {
         /// Library ordinal; negative values are special ordinals such as `-2`.
         pub lib_ordinal: i32,
@@ -1073,7 +1046,6 @@ pub mod macho {
 
     /// Decoded `dyld_chained_fixups_header`.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOChainedFixupsHeader {
         /// Structural version recorded by the linker; currently `0`.
         pub fixups_version: u32,
@@ -1093,7 +1065,6 @@ pub mod macho {
 
     /// Summary of `LC_DYLD_CHAINED_FIXUPS`.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOChainedFixupsReport {
         /// Whether the image carries the command.
         pub present: bool,
@@ -1115,7 +1086,6 @@ pub mod macho {
 
     /// One binding decoded from a classic dyld bind opcode stream.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOBinding {
         /// Stream the binding came from: `bind`, `weak` or `lazy`.
         pub stream: String,
@@ -1137,7 +1107,6 @@ pub mod macho {
 
     /// Bounded listing of the classic dyld bind opcode streams.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOBindingsReport {
         /// Whether the image carries an `LC_DYLD_INFO` or `LC_DYLD_INFO_ONLY` command.
         pub present: bool,
@@ -1151,7 +1120,6 @@ pub mod macho {
 
     /// `LC_FUNCTION_STARTS` summary.
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct MachOFunctionStartsReport {
         /// Increment base: the `__TEXT` virtual address.
         pub image_base: u64,

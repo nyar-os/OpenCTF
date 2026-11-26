@@ -97,6 +97,21 @@ fn caesar_report_converts_without_rescoring() {
 }
 
 #[test]
+fn serialized_candidate_keys_keep_the_published_names() {
+    let mut set = CandidateSet::new();
+    set.push(candidate("xor", "key 0x42", "CTF{keys}", 2.5));
+
+    let value = serde_json::to_value(&set).expect("serialize candidates");
+    assert_eq!(value["items"][0]["source"], "xor");
+    assert_eq!(value["items"][0]["label"], "key 0x42");
+    assert_eq!(value["items"][0]["value"], "CTF{keys}");
+    assert_eq!(value["items"][0]["score"], 2.5);
+    let keys: Vec<&str> = value["items"][0].as_object().expect("object").keys().map(String::as_str).collect();
+    assert_eq!(keys, vec!["label", "score", "source", "value"]);
+    assert_eq!(value.as_object().expect("object").keys().map(String::as_str).collect::<Vec<_>>(), vec!["items"]);
+}
+
+#[test]
 fn merging_two_sets_preserves_both_sources() {
     let file = TempFile::new("merge");
     file.write(b"PGS{pnrfne_fuvsg_13}");

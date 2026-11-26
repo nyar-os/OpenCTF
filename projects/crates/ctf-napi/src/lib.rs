@@ -14,6 +14,8 @@
 use wae::{CallContext, JsValue, Result, function, register_module};
 
 mod commands;
+#[doc(hidden)]
+pub mod dto;
 mod error;
 mod webview;
 

@@ -9,8 +9,10 @@ use open_ctf_solvers::{CaesarReport, XorReport};
 use serde::{Deserialize, Serialize};
 
 /// One ranked hypothesis.
+///
+/// Field names are the natural Rust `snake_case`; every field is a single
+/// token, so the serialized keys are unchanged from the earlier report shape.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Candidate {
     /// Solver that produced it, such as `xor` or `caesar`.
     pub source: String,
@@ -24,7 +26,6 @@ pub struct Candidate {
 
 /// Deduplicated and ranked candidate list.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CandidateSet {
     /// Candidates in the order they were produced.
     pub items: Vec<Candidate>,

@@ -12,7 +12,6 @@ use crate::{Candidate, Challenge, Evidence};
 
 /// The three product-level groups of one analysis.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ChallengeReport {
     /// Identity and classification of the opened artifact.
     pub challenge: Option<Challenge>,

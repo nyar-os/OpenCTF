@@ -25,7 +25,7 @@ const FIND_WINDOW: usize = 1024 * 1024;
 
 /// Inputs of one [`crate::cyclic`] call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct CyclicOptions {
     /// Pattern length; clamped to 65536.
     #[serde(default = "default_length")]
@@ -43,7 +43,6 @@ impl Default for CyclicOptions {
 
 /// Result of one cyclic pattern request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CyclicReport {
     /// Alphabet of the de Bruijn sequence.
     pub alphabet: String,

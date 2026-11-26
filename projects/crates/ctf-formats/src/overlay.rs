@@ -30,7 +30,6 @@ const PYINSTALLER_COOKIE: &[u8] = b"MEI\x0c\x0b\x0a\x0b\x0e";
 
 /// One container or archive signature found inside the overlay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OverlaySignature {
     /// Absolute file offset of the signature.
     pub offset: u64,
@@ -42,7 +41,6 @@ pub struct OverlaySignature {
 
 /// Anatomy of the bytes that follow the last `PE` section payload.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct OverlayReport {
     /// Whether the file carries any bytes after the last section payload.
     pub present: bool,

@@ -68,7 +68,7 @@ impl IpcHandler for CtfIpcHandler {
                     .cloned()
                     .or_else(|| string_field(&value, "path").map(|path| json!({ "path": path })));
                 match options {
-                    Some(raw) => match serde_json::from_value::<OpenCtfOptions>(raw) {
+                    Some(raw) => match crate::dto::request_value::<OpenCtfOptions>(raw) {
                         Ok(options) => outcome(id, "openResult", open_engine(options)),
                         Err(error) => failure_reply(id, format!("binary/parse: invalid options: {error}")),
                     },
@@ -92,7 +92,7 @@ impl IpcHandler for CtfIpcHandler {
                 None => failure_reply(id, "handle/invalid: `handle` is required".to_string()),
             },
             "binary.stringsEncoded" => match handle_field(&value) {
-                Some(handle) => match serde_json::from_value::<StringsOptions>(value.clone()) {
+                Some(handle) => match crate::dto::request_value::<StringsOptions>(value.clone()) {
                     Ok(options) => outcome(
                         id,
                         "stringsEncodedResult",

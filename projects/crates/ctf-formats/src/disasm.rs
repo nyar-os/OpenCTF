@@ -58,7 +58,6 @@ fn default_count() -> usize {
 
 /// Inputs of one `OpenCtf::disasm` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DisassembleOptions {
     /// File offset to start decoding from.
     #[serde(default)]
@@ -86,7 +85,6 @@ impl DisassembleOptions {
 
 /// One decoded instruction.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DisassemblyInstruction {
     /// Absolute address: the `PE` virtual address when available, otherwise the file offset.
     pub address: u64,
@@ -102,7 +100,6 @@ pub struct DisassemblyInstruction {
 
 /// Result of one disassembly request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DisassemblyReport {
     /// `x86` or `x64`.
     pub architecture: String,

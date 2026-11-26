@@ -63,7 +63,7 @@ impl HashAlgorithm {
 
 /// Inputs of one `OpenCtf::hash` call.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct HashOptions {
     /// Digest algorithm; defaults to `sha256`.
     #[serde(default)]
@@ -78,7 +78,6 @@ pub struct HashOptions {
 
 /// Result of one `OpenCtf::hash` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct HashReport {
     /// Algorithm identifier, lowercase.
     pub algorithm: String,

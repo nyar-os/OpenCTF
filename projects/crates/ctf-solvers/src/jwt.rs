@@ -13,7 +13,6 @@ use crate::{CtfError, Result};
 
 /// Decoded contents of one JWT.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct JwtReport {
     /// Decoded header object.
     pub header: Value,

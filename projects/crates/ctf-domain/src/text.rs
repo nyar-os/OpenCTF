@@ -60,7 +60,6 @@ fn default_limit() -> usize {
 /// Serialized as JSON with camelCase keys, so `{ "minLength": 4, "encoding": "both" }`
 /// is the wire form the addon and the TypeScript client both use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct StringsOptions {
     /// Minimum number of characters in a run; values below one are treated as one.
     #[serde(default = "default_min_length")]
@@ -87,7 +86,6 @@ impl Default for StringsOptions {
 
 /// One decoded string run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EncodedStringHit {
     /// File offset where the run starts.
     pub offset: u64,
@@ -101,7 +99,6 @@ pub struct EncodedStringHit {
 
 /// Bounded result of one encoded string scan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EncodedStringsReport {
     /// Requested encoding.
     pub encoding: StringEncoding,

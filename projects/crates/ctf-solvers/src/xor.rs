@@ -31,7 +31,7 @@ const GUESS_PREVIEW_LIMIT: usize = 96;
 
 /// Inputs of one `OpenCtf::xor` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct XorOptions {
     /// First byte of the ciphertext; defaults to the file start.
     #[serde(default)]
@@ -55,7 +55,6 @@ impl Default for XorOptions {
 
 /// One ranked single-byte key hypothesis.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct XorKeyGuess {
     /// Key byte as a number.
     pub key: u8,
@@ -69,7 +68,6 @@ pub struct XorKeyGuess {
 
 /// Result of one `OpenCtf::xor` call.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct XorReport {
     /// Ciphertext length in bytes.
     pub length: usize,

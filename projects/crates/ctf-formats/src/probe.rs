@@ -48,7 +48,7 @@ const EMBEDDED_MAGICS: &[(&str, &[u8])] = &[
 
 /// Inputs of one `OpenCtf::probe` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct ProbeOptions {
     /// Cap on reported findings; clamped to 4096.
     #[serde(default = "default_findings_limit")]
@@ -66,7 +66,6 @@ impl Default for ProbeOptions {
 
 /// One format hypothesis with its evidence offset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ProbeFinding {
     /// Format identifier the matching signature declared.
     pub format: String,
@@ -82,7 +81,6 @@ pub struct ProbeFinding {
 
 /// Result of one `OpenCtf::probe` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ProbeReport {
     /// Total file size in bytes.
     pub size: u64,

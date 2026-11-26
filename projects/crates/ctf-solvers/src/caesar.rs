@@ -20,7 +20,7 @@ const DEFAULT_LIMIT: usize = 5;
 
 /// Inputs of one `OpenCtf::caesar` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct CaesarOptions {
     /// First byte of the ciphertext; defaults to the file start.
     #[serde(default)]
@@ -44,7 +44,6 @@ impl Default for CaesarOptions {
 
 /// One ranked shift hypothesis.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CaesarCandidate {
     /// Rotation applied to reach this plaintext.
     pub shift: u8,
@@ -56,7 +55,6 @@ pub struct CaesarCandidate {
 
 /// Result of one Caesar crack or decode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CaesarReport {
     /// Ciphertext length in bytes.
     pub length: usize,

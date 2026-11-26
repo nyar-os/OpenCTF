@@ -21,7 +21,6 @@ const MAX_DUMP_LENGTH: usize = 64 * 1024 * 1024;
 /// "output": "range.bin" }` is the wire form the addon and the TypeScript
 /// client both use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DumpOptions {
     /// File offset of the first byte to export.
     pub offset: u64,
@@ -33,7 +32,6 @@ pub struct DumpOptions {
 
 /// Result of one [`crate::OpenCtf::dump`] call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DumpReport {
     /// File offset the export started at.
     pub offset: u64,

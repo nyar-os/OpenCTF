@@ -24,7 +24,7 @@ const POP_REGISTERS: [&str; 8] = ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi
 
 /// Inputs of one `OpenCtf::gadgets` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct GadgetOptions {
     /// First byte to scan; defaults to the start of the executable sections.
     #[serde(default)]
@@ -48,7 +48,6 @@ impl Default for GadgetOptions {
 
 /// One gadget candidate at a file offset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GadgetHit {
     /// Absolute file offset of the first gadget byte.
     pub offset: u64,
@@ -65,7 +64,6 @@ pub struct GadgetHit {
 
 /// Result of one `OpenCtf::gadgets` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GadgetsReport {
     /// Total bytes examined across the selected ranges.
     pub scanned: u64,

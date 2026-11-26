@@ -23,7 +23,6 @@ pub enum EvidenceKind {
 
 /// One recorded statement with the owner that produced it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Evidence {
     /// Trust level of this statement.
     pub kind: EvidenceKind,

@@ -34,12 +34,11 @@ const MARKERS: &[(&str, &[u8])] = &[
 
 /// Inputs of one `OpenCtf::packer` call.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct PackerOptions {}
 
 /// One packer hypothesis with its evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PackerMatch {
     /// Packer or protector family.
     pub packer: String,
@@ -53,7 +52,6 @@ pub struct PackerMatch {
 
 /// Result of one packer identification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PackerReport {
     /// Whether any packer signature matched.
     pub packed: bool,

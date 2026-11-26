@@ -19,7 +19,6 @@ const MAX_RANGES: usize = 64;
 
 /// One contiguous run of differing bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DiffRange {
     /// File offset where the run starts.
     pub offset: u64,
@@ -29,7 +28,6 @@ pub struct DiffRange {
 
 /// Result of one [`crate::OpenCtf::diff`] call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct DiffReport {
     /// Size of the left file.
     pub left_size: u64,

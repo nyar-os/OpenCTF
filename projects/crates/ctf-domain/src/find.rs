@@ -40,7 +40,6 @@ fn default_context() -> usize {
 /// "caseInsensitive": true }` is the wire form the addon and the TypeScript
 /// client both use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct FindOptions {
     /// Regular expression evaluated against the raw file bytes.
     pub pattern: String,
@@ -67,7 +66,6 @@ impl Default for FindOptions {
 
 /// One regex match with its position and a printable preview.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct FindHit {
     /// File offset where the match starts.
     pub offset: u64,
@@ -80,7 +78,6 @@ pub struct FindHit {
 
 /// Bounded result of one [`crate::OpenCtf::find`] call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct FindReport {
     /// Pattern that was compiled and evaluated.
     pub pattern: String,

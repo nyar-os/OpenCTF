@@ -11,7 +11,6 @@ use crate::{CtfError, Result, decode::percent_decode};
 
 /// One decoded query parameter.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UrlParam {
     /// Raw parameter name.
     pub name: String,
@@ -25,7 +24,6 @@ pub struct UrlParam {
 
 /// Result of one URL decomposition.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UrlReport {
     /// Lowercase scheme when one is present.
     pub scheme: Option<String>,

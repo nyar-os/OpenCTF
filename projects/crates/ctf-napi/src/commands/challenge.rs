@@ -14,25 +14,25 @@ use crate::{
 };
 
 fn probe_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<ProbeOptions>(options_json)
+    let options = crate::dto::request::<ProbeOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid ProbeOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.probe(&options)?))
 }
 
 fn packer_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<PackerOptions>(options_json)
+    let options = crate::dto::request::<PackerOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid PackerOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.packer(&options)?))
 }
 
 fn png_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<PngOptions>(options_json)
+    let options = crate::dto::request::<PngOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid PngOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.png(&options)?))
 }
 
 fn pcap_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<PcapOptions>(options_json)
+    let options = crate::dto::request::<PcapOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid PcapOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.pcap(&options)?))
 }

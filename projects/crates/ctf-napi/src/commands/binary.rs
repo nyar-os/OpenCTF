@@ -33,7 +33,7 @@ pub(crate) fn strings_report(handle: u64, min_len: Option<u64>, limit: Option<u6
 }
 
 fn strings_encoded_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<StringsOptions>(options_json)
+    let options = crate::dto::request::<StringsOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid StringsOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.strings_encoded(&options)?))
 }
@@ -101,7 +101,7 @@ pub(crate) fn offset_to_rva_report(handle: u64, offset: u64) -> std::result::Res
 
 pub(crate) fn binary_open(ctx: CallContext) -> Result<JsValue> {
     let raw = text(&ctx, 0)?;
-    let options = serde_json::from_str::<OpenCtfOptions>(&raw)
+    let options = crate::dto::request::<OpenCtfOptions>(&raw)
         .map_err(|error| Error::new(format!("binary/parse: invalid options: {error}")))?;
     match open_engine(options) {
         Ok(value) => respond(&ctx, &value),
@@ -648,19 +648,19 @@ pub(crate) fn search_report(handle: u64, options_json: &str) -> std::result::Res
 }
 
 fn find_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<FindOptions>(options_json)
+    let options = crate::dto::request::<FindOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid FindOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.find(&options)?))
 }
 
 fn dump_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<DumpOptions>(options_json)
+    let options = crate::dto::request::<DumpOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid DumpOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.dump(&options)?))
 }
 
 fn carve_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<CarveOptions>(options_json)
+    let options = crate::dto::request::<CarveOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid CarveOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.carve(&options)?))
 }
@@ -672,13 +672,13 @@ fn tauri_assets_report(handle: u64, options_json: &str) -> std::result::Result<V
 }
 
 fn inflate_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<InflateOptions>(options_json)
+    let options = crate::dto::request::<InflateOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid InflateOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.inflate(&options)?))
 }
 
 fn unpack_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
-    let options = serde_json::from_str::<UnpackOptions>(options_json)
+    let options = crate::dto::request::<UnpackOptions>(options_json)
         .map_err(|error| CtfError::parse(format!("invalid UnpackOptions: {error}")))?;
     with_engine(handle, |engine| encoded(&engine.unpack(&options)?))
 }

@@ -33,7 +33,7 @@ const TEXT_CHAR_LIMIT: usize = 4096;
 
 /// Inputs of one `OpenCtf::png` call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(default)]
 pub struct PngOptions {
     /// File offset of the PNG signature; defaults to zero.
     #[serde(default)]
@@ -51,7 +51,6 @@ impl Default for PngOptions {
 
 /// One PNG chunk header, with text when the chunk carries any.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PngChunk {
     /// Zero-based chunk index after the signature.
     pub index: usize,
@@ -73,7 +72,6 @@ pub struct PngChunk {
 
 /// Result of one PNG walk.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct PngReport {
     /// Width from `IHDR`.
     pub width: Option<u32>,

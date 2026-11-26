@@ -65,7 +65,6 @@ fn default_limit() -> usize {
 /// "outputDir": "C:\\tmp\\carve" }` is the wire form the addon and the
 /// TypeScript client both use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CarveOptions {
     /// Byte regex that marks the regions of interest.
     pub marker: String,
@@ -101,7 +100,6 @@ impl Default for CarveOptions {
 
 /// One printable region anchored on a marker match.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CarveRegion {
     /// File offset where the marker match starts.
     pub marker_offset: u64,
@@ -118,7 +116,6 @@ pub struct CarveRegion {
 
 /// Bounded result of one [`crate::OpenCtf::carve`] call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CarveReport {
     /// Marker regex that was compiled and evaluated.
     pub marker: String,

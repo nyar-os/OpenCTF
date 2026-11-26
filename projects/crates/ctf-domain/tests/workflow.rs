@@ -344,22 +344,22 @@ fn encoded_strings_tolerate_odd_endings_and_truncated_pairs() {
 }
 
 #[test]
-fn strings_options_use_camel_case_defaults() {
+fn strings_options_use_snake_case_defaults() {
     let defaults = serde_json::from_str::<StringsOptions>("{}").expect("default options");
     assert_eq!(defaults, StringsOptions::default());
     assert_eq!(defaults.min_length, 4);
     assert_eq!(defaults.limit, 100);
     assert_eq!(defaults.encoding, StringEncoding::Ascii);
 
-    let parsed = serde_json::from_str::<StringsOptions>(r#"{"minLength": 2, "limit": 5, "encoding": "both"}"#)
-        .expect("camelCase options");
+    let parsed = serde_json::from_str::<StringsOptions>(r#"{"min_length": 2, "limit": 5, "encoding": "both"}"#)
+        .expect("natural options");
     assert_eq!(parsed.min_length, 2);
     assert_eq!(parsed.limit, 5);
     assert_eq!(parsed.encoding, StringEncoding::Both);
 
     let report = BinaryView::from_bytes("json.bin", b"text".to_vec()).strings_encoded(&parsed).expect("json strings");
     let value = serde_json::to_value(&report).expect("report json");
-    assert_eq!(value["minLength"], 2);
+    assert_eq!(value["min_length"], 2);
     assert_eq!(value["limit"], 5);
     assert_eq!(value["encoding"], "both");
     assert_eq!(value["hits"][0]["encoding"], "ascii");
@@ -452,7 +452,7 @@ fn engine_hexdump_uses_its_configured_length() {
 fn engine_options_round_trip_through_json() {
     let file = TempFile::new("engine-json");
     file.write(b"\x00engine\x00");
-    let raw = serde_json::json!({ "path": file.path(), "minStringLen": 2 }).to_string();
+    let raw = serde_json::json!({ "path": file.path(), "min_string_len": 2 }).to_string();
     let engine = OpenCtf::from_options_json(&raw).expect("engine from json");
     assert_eq!(engine.options().min_string_len, 2);
     assert_eq!(engine.options().strings_limit, Some(100));
@@ -708,7 +708,7 @@ fn find_rejects_invalid_patterns_and_reports_empty_results() {
 }
 
 #[test]
-fn find_options_use_camel_case_defaults() {
+fn find_options_use_snake_case_defaults() {
     let defaults: FindOptions = serde_json::from_str(r#"{ "pattern": "ab" }"#).expect("minimal wire options");
     assert!(!defaults.case_insensitive);
     assert_eq!(defaults.skip, 0);
@@ -716,13 +716,13 @@ fn find_options_use_camel_case_defaults() {
     assert_eq!(defaults.context, 80);
 
     let wire = serde_json::to_value(FindOptions::default()).expect("serialize options");
-    assert!(wire.get("caseInsensitive").is_some());
+    assert!(wire.get("case_insensitive").is_some());
     assert!(serde_json::from_str::<FindOptions>("{}").is_err(), "the pattern is required");
 
     let view = BinaryView::from_bytes("find-wire.bin", b"ab\x00cd".to_vec());
     let report = view.find(&defaults).expect("wire find");
     let value = serde_json::to_value(&report).expect("serialize report");
-    assert_eq!(value["caseInsensitive"], false);
+    assert_eq!(value["case_insensitive"], false);
     assert_eq!(value["hits"][0]["offset"], 0);
     assert_eq!(value["hits"][0]["length"], 2);
     assert_eq!(value["hits"][0]["preview"], "ab.cd");
@@ -853,7 +853,7 @@ fn carve_filters_short_regions_and_clamps_the_limit() {
 }
 
 #[test]
-fn carve_options_use_camel_case_defaults() {
+fn carve_options_use_snake_case_defaults() {
     let defaults: CarveOptions = serde_json::from_str(r#"{ "marker": "ab" }"#).expect("minimal wire options");
     assert_eq!(defaults.min_region, 200);
     assert_eq!(defaults.max_region, 262_144);
@@ -865,9 +865,9 @@ fn carve_options_use_camel_case_defaults() {
     let view = BinaryView::from_bytes("carve-wire.bin", b"ab".to_vec());
     let report = view.carve(&defaults).expect("wire carve");
     let value = serde_json::to_value(&report).expect("serialize report");
-    assert_eq!(value["minRegion"], 200);
-    assert_eq!(value["expandLeft"], 4_096);
-    assert_eq!(value["outputDir"], serde_json::Value::Null);
+    assert_eq!(value["min_region"], 200);
+    assert_eq!(value["expand_left"], 4_096);
+    assert_eq!(value["output_dir"], serde_json::Value::Null);
 }
 
 #[test]
