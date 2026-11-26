@@ -25,6 +25,7 @@ use std::{
 
 use boost_crypto::encoding::hex_encode;
 use boost_source::binary::{ByteSource, ContentIdentity, ReadOutcome, ReadResult, SourceCapabilities};
+use data_binary_container::{asar, nsis as nsis_owner, pyinstaller as pyinstaller_owner};
 use data_binary_inspect::BinarySession;
 use data_binary_sevenz::{SevenZDecodeError, SevenZIndexError, decode_entry, index_7z};
 use data_compression::CodecLimits;
@@ -32,9 +33,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     CtfError, Result,
-    archive::{self, AsarOptions},
-    nsis::{self, NsisOptions},
-    pyinstaller::{self, PyInstallerOptions, PyInstallerReport},
+    archive::{AsarOptions, AsarReport},
+    nsis::{NsisOptions, NsisReport},
+    pyinstaller::{PyInstallerOptions, PyInstallerReport},
 };
 
 /// The 7z signature header magic.
@@ -203,9 +204,9 @@ pub enum UnpackReport {
     #[serde(rename = "7z")]
     SevenZ(SevenZReport),
     /// An Electron `asar` archive.
-    Asar(archive::AsarReport),
+    Asar(AsarReport),
     /// An `NSIS` installer container.
-    Nsis(nsis::NsisReport),
+    Nsis(NsisReport),
     /// A PyInstaller `CArchive` bundle or standalone `PYZ` archive.
     Pyinstaller(PyInstallerReport),
 }
@@ -234,8 +235,8 @@ pub fn analyze(session: &BinarySession, options: &UnpackOptions) -> Result<Unpac
     };
     match format {
         UnpackFormat::SevenZ => sevenz(session, options).map(UnpackReport::SevenZ),
-        UnpackFormat::Asar => archive::analyze(session, &asar_options(options)).map(UnpackReport::Asar),
-        UnpackFormat::Nsis => nsis::analyze(session, &nsis_options(options)).map(UnpackReport::Nsis),
+        UnpackFormat::Asar => asar(session, options).map(UnpackReport::Asar),
+        UnpackFormat::Nsis => nsis(session, options).map(UnpackReport::Nsis),
         UnpackFormat::Pyinstaller => pyinstaller_carchive(session, options).map(UnpackReport::Pyinstaller),
         UnpackFormat::Pyz => pyinstaller_pyz(session, options).map(UnpackReport::Pyinstaller),
         UnpackFormat::Auto => Err(CtfError::parse("the auto sniff did not resolve a format")),
@@ -254,19 +255,21 @@ fn sniff(session: &BinarySession, offset: Option<u64>) -> Result<UnpackFormat> {
         if head.len() >= 17 && word(head, 0) == ASAR_MAGIC && head[16] == b'{' {
             return Ok(UnpackFormat::Asar);
         }
-        if head.len() == 20 && head[4..20] == *nsis::SIGNATURE {
+        if head.len() == 20 && head[4..20] == *nsis_owner::SIGNATURE {
             return Ok(UnpackFormat::Nsis);
         }
-        if pyinstaller::looks_like_pyz(head) {
+        if pyinstaller_owner::looks_like_pyz(head) {
             return Ok(UnpackFormat::Pyz);
         }
     }
-    if offset.is_none_or(|value| value == 0)
-        && pyinstaller::locate_cookie(&|start, length| session.read(start, length).map(|bytes| bytes.to_vec()), size).is_some()
-    {
-        return Ok(UnpackFormat::Pyinstaller);
+    if offset.is_none_or(|value| value == 0) {
+        let window = size.min(1024);
+        let tail = session.read(size - window, window)?;
+        if pyinstaller_owner::locate_cookie(tail).is_some() {
+            return Ok(UnpackFormat::Pyinstaller);
+        }
     }
-    if offset.is_none() && nsis::locate(session, None).is_ok() {
+    if offset.is_none() && nsis_owner::locate(session.read(0, size)?, None).is_ok() {
         return Ok(UnpackFormat::Nsis);
     }
     Err(CtfError::parse("no 7z, asar, NSIS or PyInstaller container signature was found at the probe offset"))
@@ -308,22 +311,39 @@ fn pyinstaller_options(options: &UnpackOptions) -> PyInstallerOptions {
     }
 }
 
+/// Decodes one Electron `asar` archive through the container owner.
+fn asar(session: &BinarySession, options: &UnpackOptions) -> Result<AsarReport> {
+    let bytes = session.read(0, session.size())?;
+    asar::analyze(bytes, &asar_options(options)).map_err(container_error)
+}
+
+/// Decodes one `NSIS` installer through the container owner.
+fn nsis(session: &BinarySession, options: &UnpackOptions) -> Result<NsisReport> {
+    let bytes = session.read(0, session.size())?;
+    nsis_owner::analyze(bytes, &nsis_options(options)).map_err(container_error)
+}
+
 /// Decodes the PyInstaller `CArchive` whose cookie ends the file.
 fn pyinstaller_carchive(session: &BinarySession, options: &UnpackOptions) -> Result<PyInstallerReport> {
-    let engine = pyinstaller_options(options);
-    let read = |start: u64, length: u64| session.read(start, length).map(|bytes| bytes.to_vec());
-    let dir = engine.extract_dir.clone().unwrap_or_default();
-    let write = |name: &str, bytes: &[u8]| write_entry(Path::new(&dir), name, bytes);
-    pyinstaller::analyze_carchive(&read, &write, session.size(), &engine)
+    let bytes = session.read(0, session.size())?;
+    pyinstaller_owner::analyze_carchive(bytes, &pyinstaller_options(options)).map_err(container_error)
 }
 
 /// Decodes a standalone PyInstaller `PYZ` archive at the offset.
 fn pyinstaller_pyz(session: &BinarySession, options: &UnpackOptions) -> Result<PyInstallerReport> {
-    let engine = pyinstaller_options(options);
-    let read = |start: u64, length: u64| session.read(start, length).map(|bytes| bytes.to_vec());
-    let dir = engine.extract_dir.clone().unwrap_or_default();
-    let write = |name: &str, bytes: &[u8]| write_entry(Path::new(&dir), name, bytes);
-    pyinstaller::analyze_pyz(&read, &write, session.size(), &engine)
+    let bytes = session.read(0, session.size())?;
+    pyinstaller_owner::analyze_pyz(bytes, &pyinstaller_options(options)).map_err(container_error)
+}
+
+/// Maps a container-owner failure onto the shared inspection error surface.
+fn container_error(error: data_binary_container::ContainerError) -> CtfError {
+    let message = error.to_string();
+    match error.code() {
+        "binary/unsupported" => CtfError::unsupported(message),
+        "binary/range" => CtfError::range(message),
+        "binary/io" => CtfError::io(message),
+        _ => CtfError::parse(message),
+    }
 }
 
 /// Indexes one `7z` container and optionally extracts its entries.

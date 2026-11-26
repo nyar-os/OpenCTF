@@ -17,8 +17,8 @@ owns nothing else.
 |-----------|-------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Domain    | `../projects/crates/ctf-domain` (`open-ctf-domain`)               | The product: `Challenge`, `Candidate`/`CandidateSet`, `Evidence`/`EvidenceKind`, `ChallengeReport`, the stable `CtfError`, the `OpenCtf`/`BinaryView` session facade, and the workflow orchestration in `workflow/{identify,triage,solve,verify}.rs`. Product-side byte operations (`text`, `find`, `dump`, `carve`, `diff`, `entropy`) keep only the projection; their observation calls the pinned `data-binary-inspect`. |
 | Solvers   | `../projects/crates/ctf-solvers` (`open-ctf-solvers`)             | CTF algorithms: Caesar, single-byte XOR, de Bruijn cyclic patterns, text/byte decoders, digests, JWT decoding and URL decomposition. No format parsing, no report assembly. |
-| Formats   | `../projects/crates/ctf-formats` (`open-ctf-formats`)             | Format projections: pcap, png, packer and the `archive` (ASAR) reader, plus the PE/ELF/Mach-O/container modules whose facts the pinned Boost owner does not expose. The four owner-backed modules (`disasm`, `elf_symbols`, `macho/symbols`, `probe`) call their owner and keep only the projection; the remaining copies carry `TODO(boost): owner migration` and are listed with the missing field in `duplication.md`. |
-| Upstream  | `data-binary-inspect`, `data-binary-pe`, `data-binary-mach-o`, `data-binary-x64`, `data-compression` | Container detection, headers, sections, imports, exports, symbols, search, hex dumps, byte ranges, diff, entropy, encoded strings, address mapping, atomic patching, Mach-O headers, segments and sections, x86/x64 instruction decoding, the bounded DEFLATE/zlib/gzip envelopes, and the Brotli (RFC 7932) decoder. Pinned at `f191fdc4134a5be749f289315dfcacc7c4ad9200`; `data-compression` is consumed with the `lzma`, `deflate` and `brotli` features and `data-binary-x64` with `decode`. |
+| Formats   | `../projects/crates/ctf-formats` (`open-ctf-formats`)             | Format projections. `src/owners.rs` opens the session, calls the pinned owner and projects the owner type onto the existing report shape for PE, ELF, Mach-O and the pyc/PyInstaller/NSIS/asar/Tauri containers; it contains no parser. The product-local modules that remain are `pcap`, `png`, `packer`, `overlay`, `unpack`, `gadgets`, `disasm`, `probe` and `inflate`, each with its reason in `duplication.md`. |
+| Upstream  | `data-binary-inspect`, `data-binary-pe`, `data-binary-mach-o`, `data-binary-container`, `data-binary-x64`, `data-compression` | Container detection, headers, sections, imports, exports, symbols, search, hex dumps, byte ranges, diff, entropy, encoded strings, address mapping, atomic patching, PE/ELF fact readers, Mach-O headers/segments/sections/exports/fixups/signatures, Python bytecode and PyInstaller/NSIS/asar/Tauri containers, x86/x64 instruction decoding, the bounded DEFLATE/zlib/gzip envelopes, and the Brotli (RFC 7932) decoder. Pinned at `3e865d5c`; `data-compression` is consumed with the `deflate` and `brotli` features and `data-binary-x64` with `decode`. |
 | Binding   | `../projects/crates/ctf-napi` (`open-ctf-napi`)                   | JSON-in / JSON-out Node-API exports plus the WebView host. `commands/{binary,challenge,solver}.rs` forward only; `error.rs` owns the envelope; `lib.rs` owns the handle table. No inspection policy. |
 | SDK       | `projects/packages/open-ctf/src`                                  | `OpenCTF` session, report types, stable error translation, addon discovery. |
 | CLI       | `projects/packages/open-ctf/src/cli.ts`                           | Argument parsing and rendering only. |
@@ -134,28 +134,29 @@ from its support status:
 | Status          | Meaning                                                                 | Where it is recorded |
 |-----------------|-------------------------------------------------------------------------|----------------------|
 | migrated        | The fact is read from the pinned Boost owner, with no copy in this repo | Upstream table above and `duplication.md` |
-| duplicated      | A copy of an owner that exists; marked `TODO(boost): owner migration`   | `documentation/duplication.md` |
-| product-local   | No owner today; the byte logic is product-side until the wiring pass    | `documentation/duplication.md` |
+| product-local   | No owner today; the byte logic is product-side until a later pass       | `documentation/duplication.md` |
 
 The six byte-observation modules (`diff`, `find`, `text`, `dump`, `entropy`,
 `carve`) are **migrated** at the pinned revision above. `find` keeps a regex
 matcher for patterns the owner cannot express as literals; `text` keeps the
-`ascii`/`utf16le`/`both` switch and paging. The DEFLATE family in `inflate`,
-`nsis`, `pyinstaller` and `png` is also **migrated** to `data-compression`
-(`Envelope::Raw` / `Envelope::Zlib`); `miniz_oxide` was deleted from the
-workspace. The Brotli decode of `tauri` is **migrated** the same way through
-`Brotli::decode_bounded`, and the third-party `brotli` crate was deleted, so no
+`ascii`/`utf16le`/`both` switch and paging. The DEFLATE call in `inflate` and
+`png` is **migrated** to `data-compression` (`Envelope::Raw` /
+`Envelope::Zlib`); `miniz_oxide` was deleted from the workspace. The Brotli and
+DEFLATE decoders of NSIS, PyInstaller and Tauri now live inside
+`data-binary-container`, and the third-party `brotli` crate was deleted, so no
 third-party Brotli implementation remains in the dependency graph.
 
-Four format modules are now **migrated** as well: `disasm` calls
-`data-binary-x64::decode`, `elf_symbols` calls `data-binary-pe::elf`
-(`parse_elf` + `read_elf_symbols`), `macho/symbols` calls
-`data-binary-mach-o` (`parse_macho` + `read_macho_symbols`), and `probe` already
-called `data-binary-probe` for its anchored pass. `iced-x86` was deleted from
-both manifests and `Cargo.lock`; `cargo tree -e normal,build,dev -i iced-x86`
-matches no package. The other 29 `ctf-formats` modules stay **kept** because the
-owner does not expose a reported field with the same semantics; `tauri` keeps
-only its interleaved-record walk.
+The PE, ELF, Mach-O and container format modules are now **migrated** as well.
+The 23 module paths (33 files) whose parsers moved upstream were deleted;
+`ctf-formats/src/owners.rs` calls `data-binary-pe::pe`, `data-binary-pe::elf`,
+`data-binary-mach-o::mach_o` and `data-binary-container` and projects the owner
+types onto the existing reports without renaming a field. `disasm` calls
+`data-binary-x64::decode` and `probe` calls `data-binary-probe`. `iced-x86` was
+deleted from both manifests and `Cargo.lock`; `cargo tree -e normal,build,dev -i
+iced-x86` matches no package. The remaining `ctf-formats` modules are
+**product-local**: `pcap`, `png`, `packer`, `overlay`, `unpack`, `gadgets`,
+`disasm`, `probe` and `inflate` keep only CTF policy and report shape, with the
+reason recorded in `duplication.md`.
 
 Standard hex/base64 text conversions now call `boost_crypto::encoding`, the
 existing boundary that delegates base64 to `data-encoding`. `data-encoding` is

@@ -16,19 +16,22 @@ repository = "https://github.com/nyar-os/OpenCTF"
 # dependencies pin the full 40-character revision so local builds and CI resolve
 # the same commit.
 wae = { git = "https://github.com/doki-land/wae-framework.git", rev = "f92f818fde7174154d77a87b55a5e44b367034c9", default-features = false, features = ["webview"] }
-# Shared binary framework. Pinned to the revision where `data-compression` owns
-# the bounded DEFLATE/zlib/gzip envelopes and the Brotli decoder and
-# `data-binary-x64` owns the x86/x64 instruction decoder behind `decode`, so
+# Shared binary framework. Pinned to the revision where `data-binary-pe` owns
+# the PE/ELF fact readers, `data-binary-mach-o` owns the Mach-O readers,
+# `data-binary-container` owns pyc/PyInstaller/NSIS/asar/Tauri, and
+# `data-compression` keeps the bounded DEFLATE/zlib/gzip envelopes and the
+# Brotli decoder behind `data-binary-x64`'s instruction decoder feature, so
 # local builds and CI resolve the commit recorded in `Cargo.lock`.
-data-binary-inspect = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-data-binary-pe = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-data-binary-mach-o = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-data-binary-sevenz = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-data-compression = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200", features = ["lzma", "deflate", "brotli"] }
-data-binary-probe = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-data-binary-x64 = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200", default-features = false, features = ["decode"] }
-boost-crypto = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
-boost-source = { git = "https://github.com/oovm/boost.rs", rev = "f191fdc4134a5be749f289315dfcacc7c4ad9200" }
+data-binary-inspect = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-binary-pe = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-binary-mach-o = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-binary-container = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-binary-sevenz = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-compression = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c", features = ["deflate", "brotli"] }
+data-binary-probe = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+data-binary-x64 = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c", default-features = false, features = ["decode"] }
+boost-crypto = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
+boost-source = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"

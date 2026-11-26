@@ -2485,7 +2485,7 @@ fn elf_notes_bytes() -> Vec<u8> {
 #[test]
 fn pe_mitigations_read_the_optional_header() {
     let mut bytes = pe_bytes();
-    put_u16(&mut bytes, 0x98 + 0x4a, 0x0160);
+    put_u16(&mut bytes, 0x98 + 0x46, 0x0160);
 
     let view = BinaryView::from_bytes("hardened.exe", bytes);
     let report = view.mitigations().expect("PE mitigations");
@@ -2511,7 +2511,7 @@ fn pe_mitigations_read_the_optional_header() {
 fn pe_mitigations_detect_wx_relocations_and_load_config() {
     let mut bytes = pe_bytes();
     bytes.resize(0x800, 0);
-    put_u16(&mut bytes, 0x98 + 0x4a, 0x0000);
+    put_u16(&mut bytes, 0x98 + 0x46, 0x0000);
     put_u32(&mut bytes, 0x188 + 36, 0xe000_0020);
 
     put_u32(&mut bytes, 0x98 + 112 + 5 * 8, 0x1000);

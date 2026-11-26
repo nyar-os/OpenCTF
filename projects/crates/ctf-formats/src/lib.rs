@@ -7,57 +7,40 @@
 //!
 //! Status of the modules:
 //!
-//! - `pcap`, `png`, `packer` and `archive` are the CTF projections this pass
-//!   keeps; the frame, chunk and signature facts move to their Boost owner once
-//!   the pinned revision exposes them.
-//! - `disasm` calls `data-binary-x64::decode`, `elf_symbols` calls
-//!   `data-binary-pe::elf`, `macho/symbols` calls `data-binary-mach-o` and
-//!   `probe` uses `data-binary-probe`; only the report projection stays here.
-//! - The DEFLATE family in `inflate`, `nsis`, `pyinstaller` and `png` calls the
-//!   pinned `boost.rs/data-compression` envelope; no local decoder remains.
-//! - Every other module is a copy that duplicates an OpenIDA or Boost owner. It
-//!   stays reachable because consumers still exist, carries a
-//!   `TODO(boost): owner migration` marker, and is recorded in
-//!   `documentation/duplication.md` with its target owner and the missing field.
+//! - `owners` holds every projection whose parser moved to the pinned Boost
+//!   revision: PE (`data-binary-pe::pe`), ELF (`data-binary-pe::elf`), Mach-O
+//!   (`data-binary-mach-o::mach_o`) and the PyInstaller / `NSIS` / `asar` /
+//!   Tauri / Python bytecode containers (`data-binary-container`). It opens the
+//!   session, calls the owner and maps the owner type onto the existing report
+//!   shape; no format constant or opcode table is decoded there.
+//! - `pcap`, `png`, `packer`, `overlay` and `unpack` are the CTF projections
+//!   this pass keeps; the frame, chunk, signature and 7z orchestration facts
+//!   have no owner in the pinned revision.
+//! - `disasm` calls `data-binary-x64::decode`, `probe` uses
+//!   `data-binary-probe` and `inflate` calls `data-compression`; only the
+//!   report projection stays here.
 //!
 //! The stable failure type is the upstream inspection error re-exported as
 //! [`CtfError`], so a projection failure keeps the same wire code as its owner.
 
 #![recursion_limit = "256"]
 
-pub mod archive;
-pub mod certificates;
-pub mod code_signature;
-pub mod debug;
+mod owners;
+
 pub mod disasm;
-pub mod dynamic;
-pub mod elf_symbols;
 pub mod gadgets;
 pub mod inflate;
-pub mod load_config;
-pub mod macho;
-pub mod mitigations;
-pub mod notes;
-pub mod nsis;
 pub mod overlay;
 pub mod packer;
 pub mod pcap;
-pub mod pe_bound_imports;
-pub mod pe_delay_imports;
-pub mod pe_exception;
-pub mod pe_rich_header;
 pub mod png;
 pub mod probe;
-pub mod pyc;
-pub mod pyc_opcodes;
-pub mod pyinstaller;
-pub mod relocations;
-pub mod resources;
-pub mod segments;
-pub mod tauri;
-pub mod tls;
 pub mod unpack;
-pub mod version;
+
+pub use owners::*;
+
+/// Python 3.11-3.13 opcode tables, re-exported from `data-binary-container`.
+pub use data_binary_container::pyc_opcodes;
 
 pub use archive::{AsarEntry, AsarHeader, AsarReport};
 pub use certificates::{CertificatesReport, PeCertificate};
