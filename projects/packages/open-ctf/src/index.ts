@@ -6,7 +6,7 @@
  * the CLI and the studio cannot disagree about a file.
  */
 
-export { OpenCTF, capabilities } from './api.js';
+export { OpenCTF, capabilities, decodeJwt } from './api.js';
 export type { OpenCtfOptions } from './api.js';
 export { GuiError, closeGui, defaultGuiContentDir, isGuiOpen, openGui, pumpEvents, runGui } from './gui.js';
 export type { GuiCloseResult, GuiOpenResult, GuiStatus, OpenGuiOptions } from './gui.js';

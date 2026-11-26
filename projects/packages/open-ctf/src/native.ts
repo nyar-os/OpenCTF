@@ -61,6 +61,12 @@ export interface NativeBinding {
     binary_carve(handle: number, optionsJson: string): string;
     binary_tauri_assets(handle: number, optionsJson: string): string;
     binary_inflate(handle: number, optionsJson: string): string;
+    binary_probe(handle: number, optionsJson: string): string;
+    binary_hash(handle: number, optionsJson: string): string;
+    binary_decode(handle: number, optionsJson: string): string;
+    binary_xor(handle: number, optionsJson: string): string;
+    binary_gadgets(handle: number, optionsJson: string): string;
+    jwt_decode(token: string): string;
     binary_unpack(handle: number, optionsJson: string): string;
     binary_overlay(handle: number): string;
     binary_offset_to_va(handle: number, offset: number): string;

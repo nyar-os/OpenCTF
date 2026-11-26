@@ -22,7 +22,7 @@ path to use a local build instead.
 ## Example
 
 ```ts
-import { OpenCTF, capabilities } from '@wae/open-ctf';
+import { OpenCTF, capabilities, decodeJwt } from '@wae/open-ctf';
 
 const ctf = new OpenCTF({ path: 'samples/app.exe' });
 const info = ctf.info();
@@ -30,8 +30,14 @@ console.log(info.format, info.architecture, info.hash);
 console.log(ctf.sections().sections.length);
 console.log(ctf.stringsEncoded({ encoding: 'both', limit: 50 }).hits);
 console.log(ctf.imports(20).entries);
+console.log(ctf.probe().findings);
+console.log(ctf.hash({ algorithm: 'sha256' }).digest);
+console.log(ctf.decode({ codec: 'auto' }).text);
+console.log(ctf.xor().guesses[0]);
+console.log(ctf.gadgets({ limit: 20 }).hits);
 ctf.close();
 
+console.log(decodeJwt('header.payload.signature').warnings);
 console.log(capabilities().features.disassembly);
 ```
 
@@ -51,6 +57,19 @@ ctf.close();
   silently, and every constructor call must be paired with `close()`.
 - `resources()` lists the PE resource tree leaves by type, name, language and
   size. It reports `present: false` when the image has no resource directory.
+- `probe()` names a container from anchored, embedded and zip-tail magic bytes.
+  Findings are candidates with confidence, offset and reason, not parsed
+  structures.
+- `hash()` computes MD4, MD5, SHA-1 and SHA-2 digests over the whole file or one
+  byte range through the internal `boost-crypto` implementation.
+- `decode()` peels base64, base64url, hex, base32, rot13, percent encoding and
+  HTML entities; `codec: 'auto'` chains decoders while the output stays printable.
+- `xor()` brute-forces all 255 single-byte keys with a flag-aware score, or
+  decrypts with a known key.
+- `gadgets()` lists byte-level x64 `ret`, `pop`, `syscall` and stack-jump
+  candidates in executable sections; disassembler confirmation is still required.
+- `decodeJwt()` decodes a token header and payload without verifying the
+  signature, and flags `alg=none` and unsigned tokens.
 - `relocations()` decodes the PE base relocation blocks, reporting each block's
   page RVA, entry count and fixup types. It reports `present: false` when the
   image has no relocations.

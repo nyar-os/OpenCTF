@@ -659,6 +659,120 @@ with `binary/parse`; `bzip2` NSIS framing answers `binary/unsupported`.
 `json` emits the same shape as the TypeScript `UnpackReport`, tagged by
 `format`.
 
+### `probe <file>`
+
+```bash
+open-ctf probe ./samples/challenge.bin
+open-ctf probe ./samples/challenge.bin --scan-limit 0x40000 --limit 20
+```
+
+| Flag                    | Default | Meaning                                                          |
+|-------------------------|---------|------------------------------------------------------------------|
+| `--limit <count>`       | `64`    | Maximum findings; capped at 4096.                                |
+| `--scan-limit <bytes>`  | `1 MiB` | Bytes searched for magic signatures; capped at 64 MiB.           |
+
+Identifies the container from its magic bytes. Anchored start signatures cover
+PE, ELF, Mach-O (including the ambiguous `cafebabe`), PNG, JPEG, GIF, BMP, PDF,
+zip, rar, 7z, gzip, xz, bzip2, zstd, SQLite, Lua, dex, Ogg, MP3, PSD, pcap,
+pcapng, wasm, tar (`ustar` at 257) and RIFF-family `WEBP`/`WAVE`/`AVI`; the
+scanned window is also searched for strong embedded magics, and the last 66 KiB
+is checked for the zip end-of-central-directory record. Every finding names the
+format, confidence (`candidate`), offset, matched length and reason. A magic hit
+is a candidate, not a validated parse.
+
+### `hash <file>`
+
+```bash
+open-ctf hash ./samples/challenge.bin
+open-ctf hash ./samples/challenge.bin --alg md5
+open-ctf hash ./samples/challenge.bin --offset 0x200 --length 64 --alg sha1
+```
+
+| Flag               | Default  | Meaning                                                             |
+|--------------------|----------|---------------------------------------------------------------------|
+| `--alg <algorithm>`| `sha256` | `md4`, `md5`, `sha1`, `sha224`, `sha256`, `sha384` or `sha512`.     |
+| `--offset <offset>`| `0`      | First byte to hash.                                                 |
+| `--length <length>`| rest     | Bytes to hash; clamped to the available range.                      |
+
+Digests are computed by the internal `boost-crypto` implementation, so no
+external `md5sum` or `sha256sum` process is spawned. The report marks the scope
+as `file` or `range` and prints the lowercase hex digest.
+
+### `decode <file>`
+
+```bash
+open-ctf decode ./samples/stage1.txt
+open-ctf decode ./samples/stage1.txt --codec hex
+open-ctf decode ./samples/stage2.txt --codec rot13
+open-ctf decode ./samples/stage3.txt --offset 0x40 --length 200 --depth 5
+```
+
+| Flag               | Default | Meaning                                                                 |
+|--------------------|---------|-------------------------------------------------------------------------|
+| `--codec <codec>`  | `auto`  | `auto`, `base64`, `base64url`, `hex`, `base32`, `rot13`, `percent` or `html`. |
+| `--offset <offset>`| `0`     | First byte of the encoded input.                                        |
+| `--length <length>`| rest    | Bytes of encoded input.                                                 |
+| `--depth <count>`  | `3`     | Maximum chained decodes in `auto`; capped at 8.                         |
+
+`auto` tries base64, base64url, hex, base32, percent encoding and HTML entities
+in that order and applies the first decoder whose output is printable and
+shorter than its input, repeating until the chain stops. Every step is reported
+with its codec and byte counts; the final bytes are rendered as lossy UTF-8 and
+as a hex head. An explicit codec that cannot decode the input exits `1` with
+`binary/parse`.
+
+### `xor <file>`
+
+```bash
+open-ctf xor ./samples/encrypted.bin
+open-ctf xor ./samples/encrypted.bin --limit 10
+open-ctf xor ./samples/encrypted.bin --key 0x42
+```
+
+| Flag               | Default | Meaning                                                          |
+|--------------------|---------|------------------------------------------------------------------|
+| `--offset <offset>`| `0`     | First ciphertext byte.                                           |
+| `--length <length>`| rest    | Ciphertext length.                                               |
+| `--key <key>`      | —       | One-byte key as decimal (`66`), `0x` hex (`0x42`) or two hex letters (`2a`). |
+| `--limit <count>`  | `5`     | Number of guesses; capped at 255.                                |
+
+Without `--key`, all 255 single-byte keys are scored on a bounded sample and the
+best candidates are printed with a plaintext preview and score; flags, braces
+and common English letters score highest. With `--key`, the whole selected range
+is decrypted and the plaintext plus a hex head is reported.
+
+### `gadgets <file>`
+
+```bash
+open-ctf gadgets ./samples/pwn.bin
+open-ctf gadgets ./samples/app.exe --limit 200
+open-ctf gadgets ./samples/app.exe --all-sections --offset 0x400 --length 0x100
+```
+
+| Flag               | Default | Meaning                                                          |
+|--------------------|---------|------------------------------------------------------------------|
+| `--offset <offset>`| `0`     | First byte to scan.                                              |
+| `--length <length>`| rest    | Bytes to scan.                                                   |
+| `--all-sections`   | off     | Scan the whole range instead of only executable sections.        |
+| `--limit <count>`  | `64`    | Maximum gadgets; capped at 4096.                                 |
+
+Scans executable sections by default, falling back to the requested range when
+the container exposes none. Patterns are byte-level (`ret`, `ret imm16`,
+`pop r64; ret`, `leave; ret`, `syscall`, `sysenter`, `int 0x80`, `jmp rsp`,
+`call rsp`); each hit reports the file offset, mapped VA when available, kind,
+bytes and rendered text. A hit is a candidate that a disassembler must confirm.
+
+### `jwt <token>`
+
+```bash
+open-ctf jwt "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJmbGFnIn0."
+```
+
+Takes the compact token as its positional argument, so no file is opened. The
+header and payload are base64url-decoded and parsed as JSON; the signature is
+measured and hex-rendered but never verified. Warnings call out `alg=none`,
+HMAC algorithms, tokens with no signature segment and undecodable signatures.
+
 ### `diff <left> <right>`
 
 ```bash

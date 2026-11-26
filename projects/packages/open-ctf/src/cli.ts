@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createCli } from '@wae/commander';
 
-import { OpenCTF, capabilities } from './api.js';
+import { OpenCTF, capabilities, decodeJwt } from './api.js';
 import { runGui } from './gui.js';
 import type {
     BinaryInfo,
@@ -21,6 +21,8 @@ import type {
     CarveReport,
     CertificatesReport,
     DebugReport,
+    DecodeOptions,
+    DecodeReport,
     DiffReport,
     DisassemblyReport,
     DumpOptions,
@@ -34,10 +36,15 @@ import type {
     ExportsReport,
     FindOptions,
     FindReport,
+    GadgetOptions,
+    GadgetsReport,
+    HashOptions,
+    HashReport,
     ImportsReport,
     InflateFormat,
     InflateOptions,
     InflateReport,
+    JwtReport,
     NsisReport,
     AsarReport,
     SevenZReport,
@@ -64,6 +71,8 @@ import type {
     PeRichHeaderReport,
     PeLoadConfigReport,
     PeTlsReport,
+    ProbeOptions,
+    ProbeReport,
     RelocationsReport,
     ResourcesReport,
     SearchOptions,
@@ -74,6 +83,8 @@ import type {
     TauriAssetsOptions,
     TauriAssetsReport,
     VersionReport,
+    XorOptions,
+    XorReport,
 } from './types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1829,6 +1840,314 @@ cli
             ctf.close();
         }
     });
+
+function describeProbe(report: ProbeReport): string {
+    const header = `${report.findings.length} candidate(s) in ${report.scanned} of ${report.size} byte(s)${report.truncated ? ' (truncated)' : ''}`;
+    if (report.findings.length === 0) {
+        return `${header}\n  no known magic matched`;
+    }
+    const lines = [header];
+    for (const finding of report.findings) {
+        lines.push(
+            `  ${hex(finding.offset).padStart(10)} ${finding.format.padEnd(10)} ${finding.confidence.padEnd(9)} ${finding.reason}`,
+        );
+    }
+    return lines.join('\n');
+}
+
+function describeHash(report: HashReport): string {
+    const scope =
+        report.offset === null
+            ? `whole file (${report.length} byte(s))`
+            : `range ${hex(report.offset)} +${report.length} byte(s)`;
+    return `${report.algorithm} · ${scope}\n  ${report.digest}`;
+}
+
+function describeDecode(report: DecodeReport): string {
+    const chain =
+        report.steps.length === 0
+            ? 'no decoder applied'
+            : report.steps.map((step) => `${step.codec} ${step.inputLength}->${step.outputLength}`).join(' -> ');
+    const body = report.text.length > 0 ? report.text : report.hex;
+    return `${report.bytes} byte(s) · ${chain}${report.truncated ? ' (preview truncated)' : ''}\n${body}`;
+}
+
+function describeXor(report: XorReport): string {
+    if (report.key !== null) {
+        return `key 0x${report.key.toString(16).padStart(2, '0')} · ${report.length} byte(s)\n${report.plaintext ?? ''}`;
+    }
+    const lines = [`${report.length} byte(s); top ${report.guesses.length} key(s)`];
+    for (const guess of report.guesses) {
+        lines.push(`  0x${guess.keyHex} score=${guess.score.toFixed(3)}  ${guess.preview}`);
+    }
+    return lines.join('\n');
+}
+
+function describeGadgets(report: GadgetsReport): string {
+    const header = `${report.hits.length} gadget(s) in ${report.scanned} byte(s)${report.truncated ? ' (truncated)' : ''}`;
+    if (report.hits.length === 0) {
+        return `${header}\n  no basic gadget matched`;
+    }
+    const lines = [header];
+    for (const hit of report.hits) {
+        const va = hit.va === null ? '' : `va=${hex(hit.va)}`;
+        lines.push(
+            `  ${hex(hit.offset).padStart(10)} ${va.padEnd(16)} ${hit.kind.padEnd(9)} ${hit.text}  [${hit.bytes}]`,
+        );
+    }
+    return lines.join('\n');
+}
+
+function describeJwt(report: JwtReport): string {
+    const lines = [
+        `alg: ${report.algorithm.length > 0 ? report.algorithm : '(none)'}${report.unsigned ? ' · unsigned' : ''}`,
+        `header: ${JSON.stringify(report.header)}`,
+        `payload: ${JSON.stringify(report.payload)}`,
+        `signature: ${report.signatureHex.length > 0 ? `${report.signatureHex.length / 2} byte(s)` : 'absent'}`,
+    ];
+    for (const warning of report.warnings) {
+        lines.push(`warning: ${warning}`);
+    }
+    return lines.join('\n');
+}
+
+cli
+    .command('probe', 'cli.cmd.probe')
+    .option('--limit <count>', 'cli.opt.limit')
+    .option('--scan-limit <bytes>', 'cli.opt.scanLimit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const scanLimitText = text(options, 'scan-limit');
+        const scanLimit = scanLimitText === undefined ? undefined : parseNumber(scanLimitText);
+        if (scanLimitText !== undefined && scanLimit === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--scan-limit <bytes>` must be a non-negative integer' });
+            return 2;
+        }
+        const probeOptions: ProbeOptions = {
+            ...(limit === undefined ? {} : { limit }),
+            ...(scanLimit === undefined ? {} : { scanLimit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.probe(probeOptions);
+            ctx.emitResult(report, describeProbe(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('hash', 'cli.cmd.hash')
+    .option('--alg <algorithm>', 'cli.opt.alg')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--length <length>', 'cli.opt.length')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const algorithms = ['md5', 'md4', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'];
+        const algorithmText = text(options, 'alg') ?? 'sha256';
+        if (!algorithms.includes(algorithmText)) {
+            ctx.fail('cli.err.alg', { message: '`--alg` must be md5, md4, sha1, sha224, sha256, sha384 or sha512' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && length === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--length <length>` must be a non-negative integer' });
+            return 2;
+        }
+        const hashOptions: HashOptions = {
+            algorithm: algorithmText as HashOptions['algorithm'],
+            ...(offset === undefined ? {} : { offset }),
+            ...(length === undefined ? {} : { length }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.hash(hashOptions);
+            ctx.emitResult(report, describeHash(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('decode', 'cli.cmd.decode')
+    .option('--codec <codec>', 'cli.opt.codec')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--length <length>', 'cli.opt.length')
+    .option('--depth <count>', 'cli.opt.depth')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const codecs = ['auto', 'base64', 'base64url', 'hex', 'base32', 'rot13', 'percent', 'html'];
+        const codecText = text(options, 'codec') ?? 'auto';
+        if (!codecs.includes(codecText)) {
+            ctx.fail('cli.err.codec', {
+                message: '`--codec` must be auto, base64, base64url, hex, base32, rot13, percent or html',
+            });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && length === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--length <length>` must be a non-negative integer' });
+            return 2;
+        }
+        const depthText = text(options, 'depth');
+        const depth = depthText === undefined ? undefined : parseNumber(depthText);
+        if (depthText !== undefined && depth === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--depth <count>` must be a positive integer' });
+            return 2;
+        }
+        const decodeOptions: DecodeOptions = {
+            codec: codecText as DecodeOptions['codec'],
+            ...(offset === undefined ? {} : { offset }),
+            ...(length === undefined ? {} : { length }),
+            ...(depth === undefined ? {} : { depth }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.decode(decodeOptions);
+            ctx.emitResult(report, describeDecode(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('xor', 'cli.cmd.xor')
+    .option('--key <key>', 'cli.opt.xorKey')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--length <length>', 'cli.opt.length')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && length === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--length <length>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const key = text(options, 'key');
+        const xorOptions: XorOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(length === undefined ? {} : { length }),
+            ...(key === undefined ? {} : { key }),
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.xor(xorOptions);
+            ctx.emitResult(report, describeXor(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('gadgets', 'cli.cmd.gadgets')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--length <length>', 'cli.opt.length')
+    .option('--all-sections', 'cli.opt.gadgetAllSections')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && length === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--length <length>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const gadgetOptions: GadgetOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(length === undefined ? {} : { length }),
+            executableOnly: options['all-sections'] !== true,
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.gadgets(gadgetOptions);
+            ctx.emitResult(report, describeGadgets(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli.command('jwt', 'cli.cmd.jwt').actionCtx(async (options, _args, ctx) => {
+    const token = input(options);
+    if (token === undefined) {
+        ctx.fail('open-ctf.cli.token-required', { message: 'a JWT is required' });
+        return 2;
+    }
+    const report = decodeJwt(token);
+    ctx.emitResult(report, describeJwt(report));
+    return 0;
+});
 
 cli.command('diff', 'cli.cmd.diff').actionCtx(async (options, _args, ctx) => {
     const leftPath = options._?.[0];

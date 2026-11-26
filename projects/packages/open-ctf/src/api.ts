@@ -17,6 +17,8 @@ import type {
     CarveReport,
     CertificatesReport,
     DebugReport,
+    DecodeOptions,
+    DecodeReport,
     DiffReport,
     DisassembleOptions,
     DisassemblyReport,
@@ -31,10 +33,15 @@ import type {
     ExportsReport,
     FindOptions,
     FindReport,
+    GadgetOptions,
+    GadgetsReport,
+    HashOptions,
+    HashReport,
     HexdumpReport,
     ImportsReport,
     InflateOptions,
     InflateReport,
+    JwtReport,
     UnpackOptions,
     UnpackReport,
     OverlayReport,
@@ -58,6 +65,8 @@ import type {
     PeRichHeaderReport,
     PeLoadConfigReport,
     PeTlsReport,
+    ProbeOptions,
+    ProbeReport,
     PycReport,
     ReadReport,
     RelocationsReport,
@@ -72,6 +81,8 @@ import type {
     TauriAssetsOptions,
     TauriAssetsReport,
     VersionReport,
+    XorOptions,
+    XorReport,
 } from './types.js';
 
 /** Inputs of one engine session. Defaults mirror `open-ctf-core`. */
@@ -105,6 +116,11 @@ function decode<T>(work: () => string): T {
 /** Reads the capability matrix of the installed engine. */
 export function capabilities(): Capabilities {
     return decode<Capabilities>(() => binding('capabilities').capabilities());
+}
+
+/** Decodes a JWT header and payload without verifying its signature. */
+export function decodeJwt(token: string): JwtReport {
+    return decode<JwtReport>(() => binding('jwt.decode').jwt_decode(token));
 }
 
 /** One open binary and the defaults its operations use. */
@@ -323,6 +339,31 @@ export class OpenCTF {
     /** Decodes one `7z`, `asar`, `NSIS` or PyInstaller container, optionally extracting its entries. */
     unpack(options: UnpackOptions = {}): UnpackReport {
         return decode<UnpackReport>(() => binding('binary.unpack').binary_unpack(this.id, JSON.stringify(options)));
+    }
+
+    /** Identifies the container from anchored and embedded magic bytes. */
+    probe(options: ProbeOptions = {}): ProbeReport {
+        return decode<ProbeReport>(() => binding('binary.probe').binary_probe(this.id, JSON.stringify(options)));
+    }
+
+    /** Hashes the whole file or one byte range with the requested algorithm. */
+    hash(options: HashOptions = {}): HashReport {
+        return decode<HashReport>(() => binding('binary.hash').binary_hash(this.id, JSON.stringify(options)));
+    }
+
+    /** Decodes one byte range with the selected text or byte codec. */
+    decode(options: DecodeOptions = {}): DecodeReport {
+        return decode<DecodeReport>(() => binding('binary.decode').binary_decode(this.id, JSON.stringify(options)));
+    }
+
+    /** Cracks or applies a single-byte XOR key over one byte range. */
+    xor(options: XorOptions = {}): XorReport {
+        return decode<XorReport>(() => binding('binary.xor').binary_xor(this.id, JSON.stringify(options)));
+    }
+
+    /** Scans executable sections, or one explicit range, for basic x64 gadgets. */
+    gadgets(options: GadgetOptions = {}): GadgetsReport {
+        return decode<GadgetsReport>(() => binding('binary.gadgets').binary_gadgets(this.id, JSON.stringify(options)));
     }
 
     /** Searches for a hex, ASCII or UTF-16LE pattern. */

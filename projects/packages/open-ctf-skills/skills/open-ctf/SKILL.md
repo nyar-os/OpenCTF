@@ -1,6 +1,6 @@
 ---
 name: open-ctf
-description: Work a CTF challenge file with the OpenCTF toolbox. Use when a task involves identifying an unknown binary or container, triage for packing, recovering strings and hidden payloads, unpacking NSIS, asar, 7z or PyInstaller bundles, decoding CPython bytecode, disassembling x86/x64, or making a verifiable byte patch.
+description: Work a CTF challenge file with the OpenCTF toolbox. Use when a task involves identifying an unknown binary or container, triage for packing, hashing or decoding challenge data, cracking single-byte XOR, inspecting JWTs, recovering strings and hidden payloads, unpacking NSIS, asar, 7z or PyInstaller bundles, decoding CPython bytecode, disassembling x86/x64, scanning basic ROP gadgets, or making a verifiable byte patch.
 ---
 
 # open-ctf
@@ -10,20 +10,27 @@ description: Work a CTF challenge file with the OpenCTF toolbox. Use when a task
 Start with the cheapest question and only go deeper when the answer points
 somewhere:
 
-1. `open-ctf info` and `open-ctf entropy` — container, architecture, entry point
+1. `open-ctf probe` — name the container from anchored, embedded and zip-tail
+   magic bytes before assuming an extension is honest.
+2. `open-ctf info` and `open-ctf entropy` — container, architecture, entry point
    and whether the entropy suggests compression or packing.
-2. `open-ctf overlay` — trailing data, `nsis` and `pyinstaller` cookies, archive
+3. `open-ctf overlay` — trailing data, `nsis` and `pyinstaller` cookies, archive
    signatures and leading magic outside the mapped sections.
-3. `open-ctf strings --encoding both` — ASCII and ASCII-in-UTF-16LE runs, where
+4. `open-ctf strings --encoding both` — ASCII and ASCII-in-UTF-16LE runs, where
    many challenges leave a flag or an endpoint.
-4. `open-ctf unpack` — NSIS, `asar`, `7z`, PyInstaller `CArchive` or a standalone
+5. `open-ctf hash`, `open-ctf decode`, `open-ctf xor`, `open-ctf jwt` — prove
+   bytes, peel encoding layers, recover a single-byte XOR plaintext, or read a
+   token header and payload (the signature is never verified).
+6. `open-ctf unpack` — NSIS, `asar`, `7z`, PyInstaller `CArchive` or a standalone
    `pyz`, extracted into a working directory instead of executed.
-5. `open-ctf disasm` — x86/x64 machine code, or `--format pyc` for CPython
+7. `open-ctf disasm` — x86/x64 machine code, or `--format pyc` for CPython
    `marshal` streams and extracted `PYZ` modules (3.11 through 3.13 tables).
-6. `open-ctf find`, `open-ctf carve`, `open-ctf dump` — recover one payload once
+8. `open-ctf gadgets` — byte-level x64 `ret`, `pop`, `syscall` and jump-to-stack
+   candidates in executable sections.
+9. `open-ctf find`, `open-ctf carve`, `open-ctf dump` — recover one payload once
    you know roughly where it lives.
-7. `open-ctf diff` and `open-ctf patch --out` — compare revisions, or change
-   bytes in a copy and prove the change with the before/after hash.
+10. `open-ctf diff` and `open-ctf patch --out` — compare revisions, or change
+    bytes in a copy and prove the change with the before/after hash.
 
 Every step is a report, so quote the report rather than the conclusion.
 
@@ -38,7 +45,8 @@ Every step is a report, so quote the report rather than the conclusion.
 `macho-bindings`,
 `macho-slices`, `macho-extract`, `mitigations`, `resources`, `relocations`, `dynamic`, `segments`, `notes`,
 `certificates`, `tls`, `load-config`, `code-signature`, `disasm`, `entropy`, `diff`,
-`search`, `find`, `dump`, `carve`, `tauri-assets`,
+`search`, `find`, `dump`, `carve`, `tauri-assets`, `probe`, `hash`, `decode`,
+`xor`, `jwt`, `gadgets`,
 `patch` are implemented for the cases listed below. Decompilation,
 debugging and signature verification are
 **not** implemented and the capability matrix reports them as `unsupported` /
@@ -63,6 +71,12 @@ a second analysis engine. Report the stable code instead.
 | Route | Intent | Evidence |
 |-------|--------|----------|
 | inspect | Identify container, architecture, entry point and image base | `info` report plus hash |
+| probe | Name a container from head, embedded and zip-tail magic | `probe` findings with offsets and confidence |
+| hash | Prove a file or byte-range digest | `hash` report with algorithm and hex digest |
+| decode | Peel base64, base64url, hex, base32, rot13, percent or HTML layers | `decode` steps with byte counts and text |
+| xor | Recover a single-byte XOR plaintext | ranked `xor` key guesses or known-key plaintext |
+| jwt | Read a JWT header and payload | `jwt` report with algorithm, claims and warnings |
+| gadgets | List basic x64 ROP candidates | `gadgets` hits with offset, VA and bytes |
 | map | Find sections, their addresses, sizes and access flags | `sections` table |
 | discover | Locate printable strings and their offsets | `strings` listing with offsets |
 | find | Locate regex matches with printable previews | `find` report with offset, length and preview |
@@ -107,6 +121,11 @@ a second analysis engine. Report the stable code instead.
 - Never patch an offset outside the file; the engine rejects it, and a rejected
   range is not a successful patch.
 - Never present a hash as a security verdict. It only proves the bytes changed.
+- `jwt` never verifies a signature: report the decoded header and payload as
+  untrusted claims, and quote the `alg=none` or unsigned warning when present.
+- `gadgets` reports byte-level candidates; a hit is not a validated instruction
+  unless a disassembler confirms it. `probe` hits are likewise candidates, not
+  structural parses.
 - Mach-O support covers headers, load commands, segments, sections, dylibs,
   build versions, the `LC_SYMTAB` symbol table, the fat architecture table and
   the classic dyld bind opcode streams (`macho-bindings`). Do not claim runtime

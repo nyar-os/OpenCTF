@@ -1376,3 +1376,149 @@ export interface TauriAssetsReport {
     readonly truncated: boolean;
     readonly outputDir: string | null;
 }
+
+/** Inputs of one `probe()` call. */
+export interface ProbeOptions {
+    /** Maximum findings to return; defaults to 64 and is capped at 4096. */
+    readonly limit?: number;
+    /** Bytes read for signature matching; defaults to 1 MiB and is capped at 64 MiB. */
+    readonly scanLimit?: number;
+}
+
+/** One format hypothesis produced by the magic-byte probe. */
+export interface ProbeFinding {
+    readonly format: string;
+    readonly confidence: string;
+    readonly offset: number;
+    readonly length: number;
+    readonly reason: string;
+}
+
+/** Bounded result of one magic-byte probe. */
+export interface ProbeReport {
+    readonly size: number;
+    readonly scanned: number;
+    readonly findings: readonly ProbeFinding[];
+    readonly truncated: boolean;
+}
+
+/** Digest algorithm accepted by `hash()`. */
+export type HashAlgorithm = 'md5' | 'md4' | 'sha1' | 'sha224' | 'sha256' | 'sha384' | 'sha512';
+
+/** Inputs of one `hash()` call. */
+export interface HashOptions {
+    /** Digest algorithm; defaults to `sha256`. */
+    readonly algorithm?: HashAlgorithm;
+    /** First byte to hash; defaults to the file start. */
+    readonly offset?: number;
+    /** Bytes to hash; defaults to the rest of the file. */
+    readonly length?: number;
+}
+
+/** Result of one digest computation. */
+export interface HashReport {
+    readonly algorithm: string;
+    readonly source: string;
+    readonly offset: number | null;
+    readonly length: number;
+    readonly digest: string;
+}
+
+/** Decoder accepted by `decode()`. */
+export type DecodeCodec = 'auto' | 'base64' | 'base64url' | 'hex' | 'base32' | 'rot13' | 'percent' | 'html';
+
+/** Inputs of one `decode()` call. */
+export interface DecodeOptions {
+    /** Decoder to apply; `auto` chains them while the output stays printable. */
+    readonly codec?: DecodeCodec;
+    /** First byte of the encoded input; defaults to the file start. */
+    readonly offset?: number;
+    /** Bytes of encoded input; defaults to the rest of the file. */
+    readonly length?: number;
+    /** Maximum chained decodes in auto mode; defaults to 3 and is capped at 8. */
+    readonly depth?: number;
+}
+
+/** One applied decoder with its byte counts. */
+export interface DecodeStep {
+    readonly codec: string;
+    readonly inputLength: number;
+    readonly outputLength: number;
+}
+
+/** Result of one decode call. */
+export interface DecodeReport {
+    readonly steps: readonly DecodeStep[];
+    readonly bytes: number;
+    readonly text: string;
+    readonly hex: string;
+    readonly truncated: boolean;
+}
+
+/** Inputs of one `xor()` call. */
+export interface XorOptions {
+    /** First ciphertext byte; defaults to the file start. */
+    readonly offset?: number;
+    /** Ciphertext length; defaults to the rest of the file. */
+    readonly length?: number;
+    /** Known single-byte key as decimal or hex; omitted to brute-force. */
+    readonly key?: string;
+    /** Number of guesses to return; defaults to 5 and is capped at 255. */
+    readonly limit?: number;
+}
+
+/** One ranked single-byte key hypothesis. */
+export interface XorKeyGuess {
+    readonly key: number;
+    readonly keyHex: string;
+    readonly score: number;
+    readonly preview: string;
+}
+
+/** Result of one single-byte XOR crack. */
+export interface XorReport {
+    readonly length: number;
+    readonly key: number | null;
+    readonly plaintext: string | null;
+    readonly hex: string | null;
+    readonly guesses: readonly XorKeyGuess[];
+}
+
+/** Inputs of one `gadgets()` call. */
+export interface GadgetOptions {
+    /** First byte to scan; defaults to the start of the executable sections. */
+    readonly offset?: number;
+    /** Bytes to scan; defaults to the rest of the file. */
+    readonly length?: number;
+    /** Restrict the scan to executable sections; defaults to true. */
+    readonly executableOnly?: boolean;
+    /** Maximum gadgets to return; defaults to 64 and is capped at 4096. */
+    readonly limit?: number;
+}
+
+/** One ROP gadget byte candidate. */
+export interface GadgetHit {
+    readonly offset: number;
+    readonly va: number | null;
+    readonly kind: string;
+    readonly bytes: string;
+    readonly text: string;
+}
+
+/** Result of one gadget scan. */
+export interface GadgetsReport {
+    readonly scanned: number;
+    readonly hits: readonly GadgetHit[];
+    readonly truncated: boolean;
+}
+
+/** Decoded contents of one JWT. */
+export interface JwtReport {
+    readonly header: Readonly<Record<string, unknown>>;
+    readonly payload: Readonly<Record<string, unknown>>;
+    readonly algorithm: string;
+    readonly unsigned: boolean;
+    readonly signatureHex: string;
+    readonly warnings: readonly string[];
+}
+

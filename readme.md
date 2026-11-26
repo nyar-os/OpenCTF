@@ -45,6 +45,7 @@ this:
 
 ```bash
 open-ctf info ./samples/challenge.exe
+open-ctf probe ./samples/challenge.exe
 open-ctf entropy ./samples/challenge.exe
 open-ctf strings ./samples/challenge.exe --encoding both
 open-ctf overlay ./samples/challenge.exe
@@ -153,6 +154,14 @@ the TypeScript session, so a script and a person read the same result.
 - **Carving and searching.** Byte-regex `find` with printable previews and
   `carve`, which expands printable regions around marker matches and writes each
   region to a file.
+- **Six-category CTF helpers.** `probe` identifies a container from anchored,
+  embedded and zip-tail magics; `hash` computes MD4, MD5, SHA-1 and SHA-2
+  digests over a file or a byte range; `decode` chains base64, base64url, hex,
+  base32, rot13, percent encoding and HTML entities; `xor` brute-forces or
+  applies a one-byte XOR key with a flag-aware score; `gadgets` lists basic x64
+  ROP candidates in executable sections; and `jwt` decodes a token header and
+  payload, flagging `alg=none` and unsigned tokens without pretending to verify
+  them.
 - **Binary diff.** Size and hash for both sides, the first differing offset and
   the differing ranges, or a clear `identical` verdict.
 - **Patching you can audit.** Atomic writes with the before and after hash of
