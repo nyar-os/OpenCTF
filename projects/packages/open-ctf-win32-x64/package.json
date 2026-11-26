@@ -1,6 +1,6 @@
 {
     "name": "@wae/open-ctf-win32-x64",
-    "version": "0.0.2",
+    "version": "0.0.1",
     "description": "Windows x64 native addon for @wae/open-ctf",
     "license": "Apache-2.0",
     "os": ["win32"],

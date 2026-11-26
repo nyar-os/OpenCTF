@@ -1,6 +1,6 @@
 {
     "name": "@wae/open-ctf-skills",
-    "version": "0.0.2",
+    "version": "0.0.1",
     "description": "Agent skills for OpenCTF: CTF challenge triage, container unpacking, bytecode decoding and patch verification",
     "license": "Apache-2.0",
     "type": "module",
