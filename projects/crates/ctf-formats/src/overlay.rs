@@ -317,24 +317,10 @@ fn spaced_hex(bytes: &[u8]) -> String {
 
 /// Shannon entropy of one byte slice in bits per byte.
 ///
-/// The value is rounded to four decimal places, and the product entropy report
-/// in `open-ctf-domain` shares this helper so both surfaces round identically.
+/// The arithmetic belongs to `data-binary-inspect`; this helper only applies
+/// the four-decimal rounding the reports print, so the overlay and the product
+/// entropy report round identically.
 pub fn shannon(bytes: &[u8]) -> f64 {
-    if bytes.is_empty() {
-        return 0.0;
-    }
-    let mut counts = [0u64; 256];
-    for &byte in bytes {
-        counts[byte as usize] += 1;
-    }
-    let total = bytes.len() as f64;
-    let entropy = counts
-        .iter()
-        .filter(|&&count| count > 0)
-        .map(|&count| {
-            let probability = count as f64 / total;
-            -probability * probability.log2()
-        })
-        .sum::<f64>();
+    let entropy = data_binary_inspect::entropy::shannon(bytes);
     (entropy * 10_000.0).round() / 10_000.0
 }
