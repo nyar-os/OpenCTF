@@ -11,7 +11,7 @@ use std::{
     time::Instant,
 };
 
-use open_ctf_core::{CtfError, OpenCtfOptions, StringsOptions};
+use open_ctf_domain::{CtfError, OpenCtfOptions, StringsOptions};
 use serde_json::{Value, json};
 use wae::{
     CallContext, JsValue, Result, optional_string_prop,
@@ -19,8 +19,8 @@ use wae::{
 };
 
 use crate::{
-    args::{encoded, respond},
-    commands::{binary, pe, scan},
+    commands::binary,
+    error::{encoded, respond},
     registry::{close_engine, open_engine, with_engine},
 };
 
@@ -60,7 +60,7 @@ impl IpcHandler for CtfIpcHandler {
                 IpcOutcome::CloseWindow
             }
             "ready" => reply(id, "readyResult", json!({ "version": env!("CARGO_PKG_VERSION"), "platform": platform_name() })),
-            "capabilities" => reply(id, "capabilitiesResult", json!({ "capabilities": open_ctf_core::capabilities() })),
+            "capabilities" => reply(id, "capabilitiesResult", json!({ "capabilities": open_ctf_domain::capabilities() })),
             "binary.open" => {
                 let options = value
                     .get("options")
@@ -154,16 +154,16 @@ impl IpcHandler for CtfIpcHandler {
             },
             "binary.debug" => match handle_field(&value) {
                 Some(handle) => {
-                    outcome(id, "debugResult", pe::debug_report(handle, value.get("limit").and_then(Value::as_u64)))
+                    outcome(id, "debugResult", binary::debug_report(handle, value.get("limit").and_then(Value::as_u64)))
                 }
                 None => failure_reply(id, "handle/invalid: `handle` is required".to_string()),
             },
             "binary.disasm" => match (handle_field(&value), string_field(&value, "optionsJson")) {
-                (Some(handle), Some(options)) => outcome(id, "disasmResult", scan::disasm_report(handle, &options)),
+                (Some(handle), Some(options)) => outcome(id, "disasmResult", binary::disasm_report(handle, &options)),
                 _ => failure_reply(id, "binary/parse: `handle` and `optionsJson` are required".to_string()),
             },
             "binary.search" => match (handle_field(&value), string_field(&value, "optionsJson")) {
-                (Some(handle), Some(options)) => outcome(id, "searchResult", scan::search_report(handle, &options)),
+                (Some(handle), Some(options)) => outcome(id, "searchResult", binary::search_report(handle, &options)),
                 _ => failure_reply(id, "binary/parse: `handle` and `optionsJson` are required".to_string()),
             },
             "binary.entropy" => match handle_field(&value) {

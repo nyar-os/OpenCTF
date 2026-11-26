@@ -773,6 +773,99 @@ header and payload are base64url-decoded and parsed as JSON; the signature is
 measured and hex-rendered but never verified. Warnings call out `alg=none`,
 HMAC algorithms, tokens with no signature segment and undecodable signatures.
 
+### `url <url>`
+
+```bash
+open-ctf url "https://user:pass@example.com:8443/a/b?next=%2Fadmin&flag=fl%61g#top"
+```
+
+Takes the URL as its positional argument and makes no request. Scheme,
+authority, path, query and fragment are split locally; every query name and
+value is percent-decoded, the whole URL is decoded once, and embedded
+credentials or scriptable schemes (`javascript`, `data`, `vbscript`) produce a
+warning.
+
+### `cyclic`
+
+```bash
+open-ctf cyclic --length 128
+open-ctf cyclic --find "faab"
+```
+
+| Flag             | Default | Meaning                                                     |
+|------------------|---------|-------------------------------------------------------------|
+| `--length <count>` | `128` | Pattern bytes to print; capped at 65536.                    |
+| `--find <value>` | —       | Pattern piece to locate in the cyclic stream.                |
+
+Generates a de Bruijn pattern over 26 lowercase letters with order 3, so every
+three-character window is unique; the sequence repeats cyclically past its
+17576-byte period. `--find` searches a bounded 1 MiB stream and prints the
+zero-based offset, which is the value used to size a stack overflow.
+
+### `packer <file>`
+
+```bash
+open-ctf packer ./samples/packed.exe
+```
+
+Matches section names (`UPX0`, `.aspack`, `.vmp0`, `.themida`, `.MPRESS1`,
+`.petite`, `.nsp0`, `.pec1`, `.FSG!`, `.tElock`, `.perplex`) and ASCII markers
+in the first 2 MiB (`UPX!`, `MPRESS1`, `VMProtect`, `ASPack`, `WinLicense`).
+Section-name hits are `identified`; marker hits are `candidate`. When nothing
+matches, the report says so without claiming the file is unpacked.
+
+### `caesar <file>`
+
+```bash
+open-ctf caesar ./samples/rot.txt
+open-ctf caesar ./samples/rot.txt --shift 3
+open-ctf caesar ./samples/rot.txt --offset 0x40 --length 64 --limit 10
+```
+
+| Flag               | Default | Meaning                                                    |
+|--------------------|---------|------------------------------------------------------------|
+| `--shift <shift>`  | —       | Rotation `0..=25`; omit to rank every rotation.             |
+| `--offset <offset>`| `0`     | First ciphertext byte.                                      |
+| `--length <length>`| rest    | Ciphertext length.                                          |
+| `--limit <count>`  | `5`     | Number of ranked shifts; capped at 25.                      |
+
+Rotations only touch ASCII letters and preserve case. Without `--shift`, all 25
+rotations are scored with the flag-aware heuristic, so a plaintext containing
+`flag{` and English-like letters rises to the top.
+
+### `png <file>`
+
+```bash
+open-ctf png ./samples/challenge.png
+open-ctf png ./samples/appended.png --offset 0x1000 --limit 512
+```
+
+| Flag               | Default | Meaning                                                     |
+|--------------------|---------|-------------------------------------------------------------|
+| `--offset <offset>`| `0`     | File offset of the PNG signature.                           |
+| `--limit <count>`  | `256`   | Chunks to list; capped at 4096.                             |
+
+Walks every chunk header, prints `IHDR` dimensions, and decodes `tEXt`, `zTXt`
+and `iTXt` text (zlib text is inflated in-process). Bytes after `IEND` are
+reported with their offset and size. Chunk CRCs are not verified.
+
+### `pcap <file>`
+
+```bash
+open-ctf pcap ./samples/capture.pcap
+open-ctf pcap ./samples/capture.pcap --offset 0x100 --limit 5000
+```
+
+| Flag               | Default  | Meaning                                                   |
+|--------------------|----------|-----------------------------------------------------------|
+| `--offset <offset>`| `0`      | File offset of the pcap magic.                            |
+| `--limit <count>`  | `100000` | Packets to scan; capped at one million.                   |
+
+Supports classic `pcap` in either byte order and microsecond or nanosecond
+resolution; `pcapng` is rejected instead of guessed. Ethernet, raw IPv4/IPv6 and
+IPv4/IPv6 link types are walked far enough to aggregate protocols and TCP/UDP
+endpoints; payloads are never reassembled.
+
 ### `diff <left> <right>`
 
 ```bash

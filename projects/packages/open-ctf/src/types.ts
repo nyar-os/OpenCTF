@@ -1522,3 +1522,161 @@ export interface JwtReport {
     readonly warnings: readonly string[];
 }
 
+/** One decoded URL query parameter. */
+export interface UrlParam {
+    readonly name: string;
+    readonly value: string;
+    readonly decodedName: string;
+    readonly decodedValue: string;
+}
+
+/** Result of one URL decomposition. */
+export interface UrlReport {
+    readonly scheme: string | null;
+    readonly username: string | null;
+    readonly password: string | null;
+    readonly host: string | null;
+    readonly port: number | null;
+    readonly path: string;
+    readonly query: string | null;
+    readonly params: readonly UrlParam[];
+    readonly fragment: string | null;
+    readonly decoded: string;
+    readonly warnings: readonly string[];
+}
+
+/** Inputs of one `cyclic()` call. */
+export interface CyclicOptions {
+    /** Pattern length; defaults to 128 and is capped at 65536. */
+    readonly length?: number;
+    /** Pattern piece to locate in the cyclic stream. */
+    readonly find?: string;
+}
+
+/** Result of one cyclic pattern request. */
+export interface CyclicReport {
+    readonly alphabet: string;
+    readonly order: number;
+    readonly length: number;
+    readonly pattern: string;
+    readonly find: string | null;
+    readonly offset: number | null;
+}
+
+/** Inputs of one `packer()` call. */
+export interface PackerOptions {}
+
+/** One packer hypothesis. */
+export interface PackerMatch {
+    readonly packer: string;
+    readonly confidence: string;
+    readonly evidence: string;
+    readonly offset: number | null;
+}
+
+/** Result of one packer identification. */
+export interface PackerReport {
+    readonly packed: boolean;
+    readonly matches: readonly PackerMatch[];
+    readonly hints: readonly string[];
+}
+
+/** Inputs of one `caesar()` call. */
+export interface CaesarOptions {
+    /** First ciphertext byte; defaults to the file start. */
+    readonly offset?: number;
+    /** Ciphertext length; defaults to the rest of the file. */
+    readonly length?: number;
+    /** Known rotation 0..=25; omitted to try every shift. */
+    readonly shift?: number;
+    /** Number of shifts to return; defaults to 5 and is capped at 25. */
+    readonly limit?: number;
+}
+
+/** One ranked Caesar shift. */
+export interface CaesarCandidate {
+    readonly shift: number;
+    readonly score: number;
+    readonly preview: string;
+}
+
+/** Result of one Caesar crack or decode. */
+export interface CaesarReport {
+    readonly length: number;
+    readonly shift: number | null;
+    readonly plaintext: string | null;
+    readonly candidates: readonly CaesarCandidate[];
+}
+
+/** Inputs of one `png()` call. */
+export interface PngOptions {
+    /** File offset of the PNG signature; defaults to zero. */
+    readonly offset?: number;
+    /** Cap on listed chunks; defaults to 256 and is capped at 4096. */
+    readonly limit?: number;
+}
+
+/** One PNG chunk. */
+export interface PngChunk {
+    readonly index: number;
+    readonly kind: string;
+    readonly length: number;
+    readonly offset: number;
+    readonly dataOffset: number;
+    readonly keyword: string | null;
+    readonly text: string | null;
+}
+
+/** Result of one PNG walk. */
+export interface PngReport {
+    readonly width: number | null;
+    readonly height: number | null;
+    readonly bitDepth: number | null;
+    readonly colorType: number | null;
+    readonly interlace: number | null;
+    readonly chunkCount: number;
+    readonly chunks: readonly PngChunk[];
+    readonly truncated: boolean;
+    readonly complete: boolean;
+    readonly trailingOffset: number | null;
+    readonly trailingBytes: number;
+}
+
+/** Inputs of one `pcap()` call. */
+export interface PcapOptions {
+    /** File offset of the pcap magic; defaults to zero. */
+    readonly offset?: number;
+    /** Cap on scanned packets; defaults to 100000 and is capped at 1000000. */
+    readonly limit?: number;
+}
+
+/** One protocol counter. */
+export interface PcapProtocol {
+    readonly name: string;
+    readonly packets: number;
+}
+
+/** One endpoint counter. */
+export interface PcapEndpoint {
+    readonly address: string;
+    readonly packets: number;
+}
+
+/** Result of one pcap summary. */
+export interface PcapReport {
+    readonly format: string;
+    readonly endianness: string;
+    readonly timestampResolution: string;
+    readonly version: string;
+    readonly snaplen: number;
+    readonly linkType: number;
+    readonly linkName: string;
+    readonly packetCount: number;
+    readonly capturedBytes: number;
+    readonly firstTimestamp: number | null;
+    readonly lastTimestamp: number | null;
+    readonly protocols: readonly PcapProtocol[];
+    readonly endpoints: readonly PcapEndpoint[];
+    readonly truncated: boolean;
+}
+

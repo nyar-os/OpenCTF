@@ -22,7 +22,7 @@ path to use a local build instead.
 ## Example
 
 ```ts
-import { OpenCTF, capabilities, decodeJwt } from '@wae/open-ctf';
+import { OpenCTF, capabilities, cyclic, decodeJwt, parseUrl } from '@wae/open-ctf';
 
 const ctf = new OpenCTF({ path: 'samples/app.exe' });
 const info = ctf.info();
@@ -35,9 +35,15 @@ console.log(ctf.hash({ algorithm: 'sha256' }).digest);
 console.log(ctf.decode({ codec: 'auto' }).text);
 console.log(ctf.xor().guesses[0]);
 console.log(ctf.gadgets({ limit: 20 }).hits);
+console.log(ctf.packer().matches);
+console.log(ctf.caesar({ shift: 3 }).plaintext);
+console.log(ctf.png().chunks);
+console.log(ctf.pcap().protocols);
 ctf.close();
 
 console.log(decodeJwt('header.payload.signature').warnings);
+console.log(parseUrl('https://example.com/?q=flag%7Btest%7D').params);
+console.log(cyclic({ length: 32, find: 'faab' }).offset);
 console.log(capabilities().features.disassembly);
 ```
 
@@ -70,6 +76,17 @@ ctf.close();
   candidates in executable sections; disassembler confirmation is still required.
 - `decodeJwt()` decodes a token header and payload without verifying the
   signature, and flags `alg=none` and unsigned tokens.
+- `parseUrl()` splits a URL and percent-decodes its query names and values
+  without a network request.
+- `cyclic()` generates a de Bruijn pattern and returns the zero-based offset of
+  a pattern piece for stack layout measurement.
+- `packer()` identifies UPX, ASPack, VMProtect and similar protectors from
+  section names and ASCII markers, and never claims an unpacked file on a miss.
+- `caesar()` ranks all 25 rotations or applies a known shift.
+- `png()` walks PNG chunks, extracts `tEXt`/`zTXt`/`iTXt` text and reports bytes
+  after `IEND`; chunk CRCs are not verified.
+- `pcap()` summarizes classic pcap captures with protocol and endpoint counters;
+  `pcapng` is rejected instead of guessed.
 - `relocations()` decodes the PE base relocation blocks, reporting each block's
   page RVA, entry count and fixup types. It reports `present: false` when the
   image has no relocations.

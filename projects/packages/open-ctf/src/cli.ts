@@ -12,14 +12,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createCli } from '@wae/commander';
 
-import { OpenCTF, capabilities, decodeJwt } from './api.js';
+import { OpenCTF, capabilities, cyclic, decodeJwt, parseUrl } from './api.js';
 import { runGui } from './gui.js';
 import type {
     BinaryInfo,
     Capabilities,
     CarveOptions,
     CarveReport,
+    CaesarOptions,
+    CaesarReport,
     CertificatesReport,
+    CyclicOptions,
+    CyclicReport,
     DebugReport,
     DecodeOptions,
     DecodeReport,
@@ -49,6 +53,12 @@ import type {
     AsarReport,
     SevenZReport,
     PyInstallerReport,
+    PackerReport,
+    PcapOptions,
+    PcapReport,
+    PngOptions,
+    PngReport,
+    UrlReport,
     UnpackFormat,
     UnpackOptions,
     DisassemblyFormat,
@@ -2148,6 +2158,264 @@ cli.command('jwt', 'cli.cmd.jwt').actionCtx(async (options, _args, ctx) => {
     ctx.emitResult(report, describeJwt(report));
     return 0;
 });
+
+function describeUrl(report: UrlReport): string {
+    const scheme = report.scheme === null ? '' : `${report.scheme}:`;
+    const credentials = report.username === null ? '' : `${report.username}${report.password === null ? '' : ':<hidden>'}@`;
+    const authority =
+        report.host === null ? '' : `//${credentials}${report.host}${report.port === null ? '' : `:${report.port}`}`;
+    const path = report.host !== null && report.path.length > 0 ? `/${report.path}` : report.path;
+    const lines = [`${scheme}${authority}${path}`];
+    if (report.query !== null) {
+        lines.push(`query: ${report.query}`);
+    }
+    for (const param of report.params) {
+        lines.push(`  ${param.decodedName} = ${param.decodedValue}`);
+    }
+    if (report.fragment !== null) {
+        lines.push(`fragment: ${report.fragment}`);
+    }
+    if (report.decoded.length > 0 && report.decoded !== report.query) {
+        lines.push(`decoded: ${report.decoded}`);
+    }
+    for (const warning of report.warnings) {
+        lines.push(`warning: ${warning}`);
+    }
+    return lines.join('\n');
+}
+
+function describeCyclic(report: CyclicReport): string {
+    const found = report.offset === null ? 'not found' : `offset ${report.offset}`;
+    const pattern = report.pattern.length > 512 ? `${report.pattern.slice(0, 512)}...` : report.pattern;
+    return `de Bruijn order ${report.order} · ${report.length} byte(s) · ${found}\n${pattern}`;
+}
+
+function describePacker(report: PackerReport): string {
+    if (!report.packed) {
+        return ['packed: no known signature', ...report.hints].join('\n');
+    }
+    const lines = [`packed: ${report.matches.length} signature(s)`];
+    for (const match of report.matches) {
+        const offset = match.offset === null ? '' : ` @ ${hex(match.offset)}`;
+        lines.push(`  ${match.packer.padEnd(10)} ${match.confidence.padEnd(10)} ${match.evidence}${offset}`);
+    }
+    lines.push(...report.hints);
+    return lines.join('\n');
+}
+
+function describeCaesar(report: CaesarReport): string {
+    if (report.shift !== null) {
+        return `shift ${report.shift} · ${report.length} byte(s)\n${report.plaintext ?? ''}`;
+    }
+    const lines = [`${report.length} byte(s); top ${report.candidates.length} shift(s)`];
+    for (const candidate of report.candidates) {
+        lines.push(`  ${String(candidate.shift).padStart(2)} score=${candidate.score.toFixed(3)}  ${candidate.preview}`);
+    }
+    return lines.join('\n');
+}
+
+function describePng(report: PngReport): string {
+    const dimensions = report.width === null ? 'unknown size' : `${report.width}x${report.height}`;
+    const flags = `${report.complete ? '' : ' · incomplete'}${report.truncated ? ' · listing truncated' : ''}`;
+    const lines = [`PNG ${dimensions} · ${report.chunkCount} chunk(s)${flags}`];
+    for (const chunk of report.chunks) {
+        const text = chunk.keyword === null ? '' : ` ${chunk.keyword}=${chunk.text ?? ''}`;
+        lines.push(`  ${hex(chunk.offset).padStart(10)} ${chunk.kind} ${String(chunk.length).padStart(8)}${text}`);
+    }
+    if (report.trailingBytes > 0) {
+        lines.push(`trailing: ${report.trailingBytes} byte(s) at ${hex(report.trailingOffset ?? 0)}`);
+    }
+    return lines.join('\n');
+}
+
+function describePcap(report: PcapReport): string {
+    const flags = `${report.truncated ? ' · truncated' : ''}`;
+    const lines = [
+        `pcap ${report.endianness}-endian ${report.timestampResolution} · ${report.packetCount} packet(s) · ${report.linkName} (${report.linkType})${flags}`,
+    ];
+    if (report.firstTimestamp !== null) {
+        lines.push(`time: ${report.firstTimestamp.toFixed(6)} .. ${(report.lastTimestamp ?? report.firstTimestamp).toFixed(6)}`);
+    }
+    if (report.protocols.length > 0) {
+        lines.push(`protocols: ${report.protocols.map((entry) => `${entry.name}=${entry.packets}`).join(', ')}`);
+    }
+    if (report.endpoints.length > 0) {
+        lines.push(`endpoints: ${report.endpoints.map((entry) => `${entry.address}=${entry.packets}`).join(', ')}`);
+    }
+    return lines.join('\n');
+}
+
+cli.command('url', 'cli.cmd.url').actionCtx(async (options, _args, ctx) => {
+    const value = input(options);
+    if (value === undefined) {
+        ctx.fail('open-ctf.cli.url-required', { message: 'a URL is required' });
+        return 2;
+    }
+    const report = parseUrl(value);
+    ctx.emitResult(report, describeUrl(report));
+    return 0;
+});
+
+cli
+    .command('cyclic', 'cli.cmd.cyclic')
+    .option('--length <count>', 'cli.opt.length')
+    .option('--find <value>', 'cli.opt.find')
+    .actionCtx(async (options, _args, ctx) => {
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && (length === undefined || length === 0)) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--length <count>` must be a positive integer' });
+            return 2;
+        }
+        const find = text(options, 'find');
+        const cyclicOptions: CyclicOptions = {
+            ...(length === undefined ? {} : { length }),
+            ...(find === undefined ? {} : { find }),
+        };
+        const report = cyclic(cyclicOptions);
+        ctx.emitResult(report, describeCyclic(report));
+        return 0;
+    });
+
+cli.command('packer', 'cli.cmd.packer').actionCtx(async (options, _args, ctx) => {
+    const file = input(options);
+    if (file === undefined) {
+        ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+        return 2;
+    }
+    const ctf = new OpenCTF({ path: file });
+    try {
+        const report = ctf.packer({});
+        ctx.emitResult(report, describePacker(report));
+        return 0;
+    } finally {
+        ctf.close();
+    }
+});
+
+cli
+    .command('caesar', 'cli.cmd.caesar')
+    .option('--shift <shift>', 'cli.opt.shift')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--length <length>', 'cli.opt.length')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const shiftText = text(options, 'shift');
+        const shift = shiftText === undefined ? undefined : parseNumber(shiftText);
+        if (shiftText !== undefined && (shift === undefined || shift > 25)) {
+            ctx.fail('cli.err.shift', { message: '`--shift` must be an integer between 0 and 25' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const lengthText = text(options, 'length');
+        const length = lengthText === undefined ? undefined : parseNumber(lengthText);
+        if (lengthText !== undefined && length === undefined) {
+            ctx.fail('open-ctf.cli.length', { message: '`--length <length>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const caesarOptions: CaesarOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(length === undefined ? {} : { length }),
+            ...(shift === undefined ? {} : { shift }),
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.caesar(caesarOptions);
+            ctx.emitResult(report, describeCaesar(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('png', 'cli.cmd.png')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const pngOptions: PngOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.png(pngOptions);
+            ctx.emitResult(report, describePng(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('pcap', 'cli.cmd.pcap')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const pcapOptions: PcapOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.pcap(pcapOptions);
+            ctx.emitResult(report, describePcap(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
 
 cli.command('diff', 'cli.cmd.diff').actionCtx(async (options, _args, ctx) => {
     const leftPath = options._?.[0];

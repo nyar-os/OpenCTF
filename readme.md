@@ -154,6 +154,12 @@ the TypeScript session, so a script and a person read the same result.
 - **Carving and searching.** Byte-regex `find` with printable previews and
   `carve`, which expands printable regions around marker matches and writes each
   region to a file.
+- **Deeper container and cipher triage.** `url` decomposes a URL and decodes its
+  query parameters; `cyclic` generates a de Bruijn pattern and finds a stack
+  offset; `packer` identifies UPX, ASPack, VMProtect and similar protectors from
+  section names and markers; `caesar` ranks or applies rotations;
+  `png` walks chunks, extracts text and reports bytes after `IEND`; and `pcap`
+  summarizes classic captures with protocol and endpoint counters.
 - **Six-category CTF helpers.** `probe` identifies a container from anchored,
   embedded and zip-tail magics; `hash` computes MD4, MD5, SHA-1 and SHA-2
   digests over a file or a byte range; `decode` chains base64, base64url, hex,

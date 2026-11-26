@@ -1,0 +1,20 @@
+[package]
+name = "open-ctf-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "OpenCTF challenge model, candidates, evidence, reports and workflows"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }
+data-binary-inspect = { workspace = true }
+open-ctf-solvers = { workspace = true }
+open-ctf-formats = { workspace = true }

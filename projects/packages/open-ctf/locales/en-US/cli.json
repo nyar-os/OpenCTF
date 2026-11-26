@@ -46,6 +46,12 @@
             "xor": "Brute-force single-byte XOR keys or decrypt with a known key",
             "gadgets": "Scan executable sections for basic x64 ROP gadgets",
             "jwt": "Decode a JWT header and payload without verifying the signature",
+            "url": "Decompose a URL and percent-decode its query parameters",
+            "cyclic": "Generate a de Bruijn cyclic pattern and locate an offset",
+            "packer": "Identify common packers from section names and image markers",
+            "caesar": "Brute-force Caesar rotations or decode with a known shift",
+            "png": "Walk PNG chunks, extract text and detect bytes after IEND",
+            "pcap": "Summarize a classic pcap capture: protocols and endpoints",
             "search": "Search for hex bytes, ASCII text or UTF-16LE text",
             "find": "Search the whole file with a byte regex and preview every match",
             "dump": "Export a raw byte range from the file to a new file",
@@ -94,6 +100,8 @@
             "depth": "Maximum chained decodes in auto mode (default 3, capped at 8)",
             "xorKey": "Single-byte key as decimal or 0x-prefixed hex; omit to brute-force",
             "gadgetAllSections": "Scan the whole range instead of only executable sections",
+            "find": "Pattern piece to locate in the cyclic stream",
+            "shift": "Caesar rotation between 0 and 25; omit to try every shift",
             "disasmFormat": "Decoding path: auto, x86 or pyc (default auto)",
             "disasmCode": "Keep only code objects whose qualname or name contains this text (pyc only)",
             "disasmPython": "Opcode table for a raw marshal stream: 311, 312 or 313 (pyc containers use their magic; pyc only)",
@@ -117,7 +125,8 @@
             "outputRequired": "--output <path> is required",
             "markerRequired": "--marker <regex> is required",
             "alg": "`--alg` must be md4, md5, sha1, sha224, sha256, sha384 or sha512",
-            "codec": "`--codec` must be auto, base64, base64url, hex, base32, rot13, percent or html"
+            "codec": "`--codec` must be auto, base64, base64url, hex, base32, rot13, percent or html",
+            "shift": "`--shift` must be an integer between 0 and 25"
         }
     }
 }

@@ -18,18 +18,23 @@ somewhere:
    signatures and leading magic outside the mapped sections.
 4. `open-ctf strings --encoding both` — ASCII and ASCII-in-UTF-16LE runs, where
    many challenges leave a flag or an endpoint.
-5. `open-ctf hash`, `open-ctf decode`, `open-ctf xor`, `open-ctf jwt` — prove
-   bytes, peel encoding layers, recover a single-byte XOR plaintext, or read a
-   token header and payload (the signature is never verified).
-6. `open-ctf unpack` — NSIS, `asar`, `7z`, PyInstaller `CArchive` or a standalone
+5. `open-ctf hash`, `open-ctf decode`, `open-ctf xor`, `open-ctf jwt`,
+   `open-ctf caesar`, `open-ctf url` — prove bytes, peel encoding layers,
+   recover a single-byte XOR or rotation plaintext, read a token header and
+   payload (never verified), or decode URL query parameters.
+6. `open-ctf packer` and `open-ctf png` — check for UPX/ASPack/VMProtect-style
+   protectors, or walk PNG chunks for text and bytes after `IEND`.
+7. `open-ctf unpack` — NSIS, `asar`, `7z`, PyInstaller `CArchive` or a standalone
    `pyz`, extracted into a working directory instead of executed.
-7. `open-ctf disasm` — x86/x64 machine code, or `--format pyc` for CPython
+8. `open-ctf disasm` — x86/x64 machine code, or `--format pyc` for CPython
    `marshal` streams and extracted `PYZ` modules (3.11 through 3.13 tables).
-8. `open-ctf gadgets` — byte-level x64 `ret`, `pop`, `syscall` and jump-to-stack
-   candidates in executable sections.
-9. `open-ctf find`, `open-ctf carve`, `open-ctf dump` — recover one payload once
-   you know roughly where it lives.
-10. `open-ctf diff` and `open-ctf patch --out` — compare revisions, or change
+9. `open-ctf gadgets` — byte-level x64 `ret`, `pop`, `syscall` and jump-to-stack
+   candidates in executable sections; `open-ctf cyclic --find` when a stack
+   offset is needed.
+10. `open-ctf pcap` — summarize a capture's link type, protocols and endpoints.
+11. `open-ctf find`, `open-ctf carve`, `open-ctf dump` — recover one payload once
+    you know roughly where it lives.
+12. `open-ctf diff` and `open-ctf patch --out` — compare revisions, or change
     bytes in a copy and prove the change with the before/after hash.
 
 Every step is a report, so quote the report rather than the conclusion.
@@ -46,7 +51,7 @@ Every step is a report, so quote the report rather than the conclusion.
 `macho-slices`, `macho-extract`, `mitigations`, `resources`, `relocations`, `dynamic`, `segments`, `notes`,
 `certificates`, `tls`, `load-config`, `code-signature`, `disasm`, `entropy`, `diff`,
 `search`, `find`, `dump`, `carve`, `tauri-assets`, `probe`, `hash`, `decode`,
-`xor`, `jwt`, `gadgets`,
+`xor`, `jwt`, `gadgets`, `url`, `cyclic`, `packer`, `caesar`, `png`, `pcap`,
 `patch` are implemented for the cases listed below. Decompilation,
 debugging and signature verification are
 **not** implemented and the capability matrix reports them as `unsupported` /
@@ -77,6 +82,12 @@ a second analysis engine. Report the stable code instead.
 | xor | Recover a single-byte XOR plaintext | ranked `xor` key guesses or known-key plaintext |
 | jwt | Read a JWT header and payload | `jwt` report with algorithm, claims and warnings |
 | gadgets | List basic x64 ROP candidates | `gadgets` hits with offset, VA and bytes |
+| cyclic | Generate a cyclic pattern and locate an offset | pattern plus zero-based offset |
+| packer | Identify common protectors | `packer` matches with confidence and hints |
+| caesar | Crack a rotation cipher | ranked shifts with preview |
+| url | Decompose a URL and decode query values | decoded params and warnings |
+| png | Walk PNG chunks and trailing data | IHDR, text chunks and trailing bytes |
+| pcap | Summarize a capture | protocols and endpoint counters |
 | map | Find sections, their addresses, sizes and access flags | `sections` table |
 | discover | Locate printable strings and their offsets | `strings` listing with offsets |
 | find | Locate regex matches with printable previews | `find` report with offset, length and preview |
@@ -125,7 +136,8 @@ a second analysis engine. Report the stable code instead.
   untrusted claims, and quote the `alg=none` or unsigned warning when present.
 - `gadgets` reports byte-level candidates; a hit is not a validated instruction
   unless a disassembler confirms it. `probe` hits are likewise candidates, not
-  structural parses.
+  structural parses. `png` does not verify chunk CRCs and `pcap` rejects
+  `pcapng` instead of guessing.
 - Mach-O support covers headers, load commands, segments, sections, dylibs,
   build versions, the `LC_SYMTAB` symbol table, the fat architecture table and
   the classic dyld bind opcode streams (`macho-bindings`). Do not claim runtime

@@ -15,7 +15,11 @@ import type {
     Capabilities,
     CarveOptions,
     CarveReport,
+    CaesarOptions,
+    CaesarReport,
     CertificatesReport,
+    CyclicOptions,
+    CyclicReport,
     DebugReport,
     DecodeOptions,
     DecodeReport,
@@ -45,6 +49,8 @@ import type {
     UnpackOptions,
     UnpackReport,
     OverlayReport,
+    PackerOptions,
+    PackerReport,
     MachOReport,
     MachOSlicesReport,
     MachOSliceExtraction,
@@ -59,6 +65,8 @@ import type {
     OffsetToRvaReport,
     OffsetToVaReport,
     PatchReport,
+    PngOptions,
+    PngReport,
     PeBoundImportsReport,
     PeDelayImportsReport,
     PeExceptionReport,
@@ -67,6 +75,8 @@ import type {
     PeTlsReport,
     ProbeOptions,
     ProbeReport,
+    PcapOptions,
+    PcapReport,
     PycReport,
     ReadReport,
     RelocationsReport,
@@ -80,12 +90,13 @@ import type {
     SymbolsReport,
     TauriAssetsOptions,
     TauriAssetsReport,
+    UrlReport,
     VersionReport,
     XorOptions,
     XorReport,
 } from './types.js';
 
-/** Inputs of one engine session. Defaults mirror `open-ctf-core`. */
+/** Inputs of one engine session. Defaults mirror `open-ctf-domain`. */
 export interface OpenCtfOptions {
     /** Binary to open. */
     readonly path: string;
@@ -121,6 +132,16 @@ export function capabilities(): Capabilities {
 /** Decodes a JWT header and payload without verifying its signature. */
 export function decodeJwt(token: string): JwtReport {
     return decode<JwtReport>(() => binding('jwt.decode').jwt_decode(token));
+}
+
+/** Generates a de Bruijn cyclic pattern and optionally locates a value. */
+export function cyclic(options: CyclicOptions = {}): CyclicReport {
+    return decode<CyclicReport>(() => binding('cyclic.run').cyclic_run(JSON.stringify(options)));
+}
+
+/** Decomposes one URL string without making a request. */
+export function parseUrl(input: string): UrlReport {
+    return decode<UrlReport>(() => binding('url.parse').url_parse(input));
 }
 
 /** One open binary and the defaults its operations use. */
@@ -364,6 +385,26 @@ export class OpenCTF {
     /** Scans executable sections, or one explicit range, for basic x64 gadgets. */
     gadgets(options: GadgetOptions = {}): GadgetsReport {
         return decode<GadgetsReport>(() => binding('binary.gadgets').binary_gadgets(this.id, JSON.stringify(options)));
+    }
+
+    /** Identifies common packers from section names and image markers. */
+    packer(options: PackerOptions = {}): PackerReport {
+        return decode<PackerReport>(() => binding('binary.packer').binary_packer(this.id, JSON.stringify(options)));
+    }
+
+    /** Decodes or brute-forces a Caesar rotation over one byte range. */
+    caesar(options: CaesarOptions = {}): CaesarReport {
+        return decode<CaesarReport>(() => binding('binary.caesar').binary_caesar(this.id, JSON.stringify(options)));
+    }
+
+    /** Walks PNG chunks and extracts text and trailing data. */
+    png(options: PngOptions = {}): PngReport {
+        return decode<PngReport>(() => binding('binary.png').binary_png(this.id, JSON.stringify(options)));
+    }
+
+    /** Summarizes one classic pcap capture. */
+    pcap(options: PcapOptions = {}): PcapReport {
+        return decode<PcapReport>(() => binding('binary.pcap').binary_pcap(this.id, JSON.stringify(options)));
     }
 
     /** Searches for a hex, ASCII or UTF-16LE pattern. */

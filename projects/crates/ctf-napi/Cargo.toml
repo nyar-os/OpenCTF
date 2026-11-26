@@ -15,7 +15,8 @@ workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-open-ctf-core = { workspace = true }
+open-ctf-domain = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+boost-crypto = { workspace = true }
 wae = { workspace = true }

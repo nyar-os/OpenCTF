@@ -10,21 +10,24 @@ agent-facing documentation lives in [agents.md](agents.md).
 
 | Path                                           | What it is                                                                                                                                                                                                                                                                                                                                                                      |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `../projects/crates/ctf-core`                  | Rust crate `open-ctf-core`: session defaults, `OpenCtf` API, PE debug/CodeView and version-resource parsing, Mach-O load-command identity, disassembly, binary diff, entropy and encoded string scanning, stable errors and the capability matrix. Container decoding, imports, exports, symbols, search, hex dumps and patching come from the pinned `boost.rs` binary crates. |
-| `../projects/crates/ctf-napi`                  | Rust crate `open-ctf-napi`: `cdylib` Node-API exports and the Studio WebView host. It maps JSON in and JSON out; no analysis lives here.                                                                                                                                                                                                                                        |
-| `projects/packages/open-ctf`                   | TypeScript package `@wae/open-ctf`: `OpenCTF` session (`src/api.ts`), CLI (`src/cli.ts`, bin `open-ctf`), GUI helpers, stable errors, types and `locales/en-US/cli.json`.                                                                                                                                                                                                       |
-| `projects/packages/open-ctf/tests`             | TypeScript smoke test compiled with `tsconfig.test.json` into `dist-test`. Test files do not live under `src`.                                                                                                                                                                                                                                                                  |
-| `../projects/crates/ctf-core`                  | Rust integration tests for the core crate.                                                                                                                                                                                                                                                                                                                                      |
-| `projects/packages/open-ctf-ui`                | `@wae/open-ctf-ui`: VMZ static shell for the Studio window. `vmz build . --profile static` emits `dist/static`, staged into `open-ctf/dist/gui`.                                                                                                                                                                                                                                |
-| `projects/packages/open-ctf-skills`            | `@wae/open-ctf-skills`: skill document under `skills/`. No runtime library and no analysis.                                                                                                                                                                                                                                                                                     |
-| `projects/packages/open-ctf-<platform>-<arch>` | Five prebuilt addon packages: `win32-x64`, `darwin-x64`, `darwin-arm64`, `linux-x64`, `linux-arm64`. Each is a thin manifest around a staged `.node` file.                                                                                                                                                                                                                      |
-| `projects/sites/homepage`                      | `@wae/open-ctf-homepage`: VMZ product site.                                                                                                                                                                                                                                                                                                                                     |
-| `wae.config.ts`                                | Build order, native targets, platform package mapping, staging, skills registration, CI job names and window behaviour.                                                                                                                                                                                                                                                         |
-| `Cargo.toml`                                   | Cargo workspace; members are `projects/crates/*`, default members `core` and `napi`.                                                                                                                                                                                                                                                                                            |
-| `pnpm-workspace.yaml`                          | pnpm workspace covering `projects/packages/*` and `projects/sites/*`.                                                                                                                                                                                                                                                                                                           |
+| `../projects/crates/ctf-domain`                | Rust crate `open-ctf-domain`: `Challenge`, `Candidate`/`CandidateSet`, `Evidence`, `ChallengeReport`, the stable `CtfError`, the `OpenCtf`/`BinaryView` session facade and `workflow/{identify,triage,solve,verify}`. Byte-observation projections (`text`, `find`, `diff`, `entropy`, `dump`, `carve`) call the pinned `data-binary-inspect`. |
+| `../projects/crates/ctf-solvers`               | Rust crate `open-ctf-solvers`: Caesar, single-byte XOR, cyclic patterns, decoders, digests, JWT and URL decomposition. Algorithms only; no format parsing. |
+| `../projects/crates/ctf-formats`               | Rust crate `open-ctf-formats`: pcap, png, packer and the `archive` (ASAR) reader, plus the PE/ELF/Mach-O/container modules that still copy a Boost owner. Copies carry `TODO(boost): owner migration` and are listed in [duplication.md](duplication.md). |
+| `../projects/crates/ctf-napi`                  | Rust crate `open-ctf-napi`: `cdylib` Node-API exports and the Studio WebView host. It maps JSON in and JSON out; no analysis lives here. |
+| `projects/packages/open-ctf`                   | TypeScript package `@wae/open-ctf`: `OpenCTF` session (`src/api.ts`), CLI (`src/cli.ts`, bin `open-ctf`), GUI helpers, stable errors, types and `locales/en-US/cli.json`. |
+| `projects/packages/open-ctf/tests`             | TypeScript smoke test compiled with `tsconfig.test.json` into `dist-test`. Test files do not live under `src`. |
+| `../projects/crates/*/tests`                   | Rust integration tests, grouped by owner: `ctf-formats/tests/projections.rs`, `ctf-solvers/tests/{algorithms,fixtures}.rs`, `ctf-domain/tests/{challenge,candidate,workflow}.rs`. |
+| `projects/packages/open-ctf-ui`                | `@wae/open-ctf-ui`: VMZ static shell for the Studio window. `vmz build . --profile static` emits `dist/static`, staged into `open-ctf/dist/gui`. |
+| `projects/packages/open-ctf-skills`            | `@wae/open-ctf-skills`: skill document under `skills/`. No runtime library and no analysis. |
+| `projects/packages/open-ctf-<platform>-<arch>` | Five prebuilt addon packages: `win32-x64`, `darwin-x64`, `darwin-arm64`, `linux-x64`, `linux-arm64`. Each is a thin manifest around a staged `.node` file. |
+| `projects/sites/homepage`                      | `@wae/open-ctf-homepage`: VMZ product site. |
+| `wae.config.ts`                                | Build order, native targets, platform package mapping, staging, skills registration, CI job names and window behaviour. |
+| `Cargo.toml`                                   | Cargo workspace; members are `projects/crates/*`, default members `ctf-domain` and `ctf-napi`. |
+| `pnpm-workspace.yaml`                          | pnpm workspace covering `projects/packages/*` and `projects/sites/*`. |
 
-The CLI, SDK and Studio all read the same core crate. A behaviour change in
-`core` reaches every surface; `capabilities()` is the single disclosure point.
+The CLI, SDK and Studio all read the same domain crate. A behaviour change in
+`ctf-domain` reaches every surface; `capabilities()` is the single disclosure
+point.
 
 ## Build and test
 
@@ -39,14 +42,14 @@ pnpm build                    # wae build: native -> ts -> ui -> skills -> stagi
 pnpm typecheck                # pnpm -r --filter "./projects/packages/*" run typecheck
 pnpm test                     # package tests
 pnpm test:rust                # cargo test --release
-pnpm check:rust               # fmt check + clippy -D warnings + core/napi tests
+pnpm check:rust               # fmt check + clippy -D warnings + workspace tests
 ```
 
 Useful narrower commands:
 
 ```bash
-cargo test -p open-ctf-core
-cargo test -p open-ctf-core --release
+cargo test -p open-ctf-domain
+cargo test -p open-ctf-domain --release
 cargo test -p open-ctf-napi
 pnpm build:ts                 # tsc for @wae/open-ctf
 pnpm build:ui                 # static Studio shell
@@ -76,15 +79,17 @@ product surface.
 Cross-repository dependencies pin a full 40-character revision, not a branch or
 tag:
 
-- The workspace `Cargo.toml` pins `data-binary-inspect` and `data-binary-pe` to
-  `5ed79ccd125d035b7286c8073b6c9b4ee384dbfb` from `oovm/boost.rs`.
+- The workspace `Cargo.toml` pins `data-binary-inspect`, `data-binary-pe` and
+  `data-compression` to `0e2b81c435713bad883a27e577baa01ff40322f1` from
+  `oovm/boost.rs`.
 - The workspace `Cargo.toml` pins `wae` to
   `f92f818fde7174154d77a87b55a5e44b367034c9` from `doki-land/wae-framework`.
 
-`open-ctf-core` deliberately parses the PE debug directory and CodeView records
-itself because the pinned `data-binary-inspect` release does not expose them.
-Do not "fix" that by bumping the pin without re-reading the upstream API and
-running the core tests.
+`open-ctf-formats` deliberately parses the PE debug directory and CodeView
+records itself because the pinned `data-binary-inspect` release does not expose
+them. The module is marked `TODO(boost): owner migration` and listed in
+[duplication.md](duplication.md). Do not "fix" that by bumping the pin without
+re-reading the upstream API and running the projection tests.
 
 ## Release and publishing
 

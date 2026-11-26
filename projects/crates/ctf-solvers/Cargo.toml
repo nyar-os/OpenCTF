@@ -1,0 +1,22 @@
+[package]
+name = "open-ctf-solvers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "CTF solver algorithms: Caesar, XOR, cyclic patterns, encodings, digests, JWT and URLs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+data-binary-inspect = { workspace = true }
+boost-crypto = { workspace = true }
+
+[dev-dependencies]
+open-ctf-domain = { workspace = true }
+

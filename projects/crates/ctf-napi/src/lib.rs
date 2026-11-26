@@ -2,9 +2,10 @@
 //!
 //! Every export performs one orthogonal operation and returns a JSON string, so
 //! the TypeScript layer owns argument parsing, help text and exit codes. Binary
-//! semantics stay in `open-ctf-core`; this layer only forwards operations, keeps
-//! the live handle table and hosts the WebView window. The CLI and the studio
-//! share the same table, so a file opened from one is visible to the other.
+//! semantics stay in `open-ctf-domain`; this layer only forwards operations,
+//! keeps the live handle table and hosts the WebView window. The CLI and the
+//! studio share the same table, so a file opened from one is visible to the
+//! other.
 //!
 //! The `#[function]` entry points and `register_module!` stay in the crate root
 //! because the wae macros reference their generated registration items by bare
@@ -12,12 +13,75 @@
 
 use wae::{CallContext, JsValue, Result, function, register_module};
 
-mod args;
 mod commands;
-mod registry;
+mod error;
 mod webview;
 
-use commands::{binary, ctf, elf, macho, pe, scan};
+use commands::{binary, challenge, solver};
+
+/// One live engine table per process, shared by every surface.
+mod registry {
+    use std::{
+        collections::HashMap,
+        sync::{Mutex, MutexGuard, OnceLock},
+    };
+
+    use open_ctf_domain::{CtfError, OpenCtf, OpenCtfOptions};
+    use serde_json::{Value, json};
+
+    use crate::error::encoded;
+
+    pub(crate) struct Registry {
+        next: u64,
+        pub(crate) engines: HashMap<u64, OpenCtf>,
+    }
+
+    fn registry() -> &'static Mutex<Registry> {
+        static REGISTRY: OnceLock<Mutex<Registry>> = OnceLock::new();
+        REGISTRY.get_or_init(|| Mutex::new(Registry { next: 1, engines: HashMap::new() }))
+    }
+
+    pub(crate) fn lock() -> std::result::Result<MutexGuard<'static, Registry>, CtfError> {
+        registry().lock().map_err(|_| CtfError::io("the binary handle table is poisoned"))
+    }
+
+    pub(crate) fn missing(handle: u64) -> CtfError {
+        CtfError::new("handle/invalid", format!("no live binary has handle {handle}"))
+    }
+
+    pub(crate) fn with_engine(
+        handle: u64,
+        work: impl FnOnce(&OpenCtf) -> std::result::Result<Value, CtfError>,
+    ) -> std::result::Result<Value, CtfError> {
+        let registry = lock()?;
+        let engine = registry.engines.get(&handle).ok_or_else(|| missing(handle))?;
+        work(engine)
+    }
+
+    pub(crate) fn with_engine_mut(
+        handle: u64,
+        work: impl FnOnce(&mut OpenCtf) -> std::result::Result<Value, CtfError>,
+    ) -> std::result::Result<Value, CtfError> {
+        let mut registry = lock()?;
+        let engine = registry.engines.get_mut(&handle).ok_or_else(|| missing(handle))?;
+        work(engine)
+    }
+
+    pub(crate) fn open_engine(options: OpenCtfOptions) -> std::result::Result<Value, CtfError> {
+        let engine = OpenCtf::new(options)?;
+        let info = encoded(&engine.info()?)?;
+        let mut registry = lock()?;
+        let handle = registry.next;
+        registry.next += 1;
+        registry.engines.insert(handle, engine);
+        Ok(json!({ "handle": handle, "info": info }))
+    }
+
+    pub(crate) fn close_engine(handle: u64) -> std::result::Result<(), CtfError> {
+        let mut registry = lock()?;
+        registry.engines.remove(&handle).map(|_| ()).ok_or_else(|| missing(handle))
+    }
+}
 
 /// Library version of the native binding.
 #[function]
@@ -28,7 +92,7 @@ fn version(ctx: CallContext) -> Result<JsValue> {
 /// Reports the implemented and explicitly unsupported capability matrix.
 #[function]
 fn capabilities(ctx: CallContext) -> Result<JsValue> {
-    let matrix = open_ctf_core::capabilities().to_string();
+    let matrix = open_ctf_domain::capabilities().to_string();
     ctx.env().string(&matrix)
 }
 
@@ -65,79 +129,115 @@ fn binary_strings_encoded(ctx: CallContext) -> Result<JsValue> {
 /// Searches the whole file with a byte regex described by an options JSON.
 #[function]
 fn binary_find(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_find(ctx)
+    binary::binary_find(ctx)
 }
 
 /// Exports a raw byte range into a caller-chosen file, described by an options JSON.
 #[function]
 fn binary_dump(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_dump(ctx)
+    binary::binary_dump(ctx)
 }
 
 /// Carves the printable regions around marker matches, described by an options JSON.
 #[function]
 fn binary_carve(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_carve(ctx)
+    binary::binary_carve(ctx)
 }
 
 /// Extracts the embedded assets of a Tauri v2 container, described by an options JSON.
 #[function]
 fn binary_tauri_assets(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_tauri_assets(ctx)
+    binary::binary_tauri_assets(ctx)
 }
 
 /// Decodes one embedded zlib, gzip or raw DEFLATE stream, described by an options JSON.
 #[function]
 fn binary_inflate(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_inflate(ctx)
+    binary::binary_inflate(ctx)
 }
 
 /// Identifies the container from magic bytes, described by an options JSON.
 #[function]
 fn binary_probe(ctx: CallContext) -> Result<JsValue> {
-    ctf::binary_probe(ctx)
+    challenge::binary_probe(ctx)
 }
 
 /// Hashes the whole file or one byte range, described by an options JSON.
 #[function]
 fn binary_hash(ctx: CallContext) -> Result<JsValue> {
-    ctf::binary_hash(ctx)
+    solver::binary_hash(ctx)
 }
 
 /// Decodes one byte range with the selected codec, described by an options JSON.
 #[function]
 fn binary_decode(ctx: CallContext) -> Result<JsValue> {
-    ctf::binary_decode(ctx)
+    solver::binary_decode(ctx)
 }
 
 /// Cracks or applies a single-byte XOR key, described by an options JSON.
 #[function]
 fn binary_xor(ctx: CallContext) -> Result<JsValue> {
-    ctf::binary_xor(ctx)
+    solver::binary_xor(ctx)
 }
 
 /// Scans executable sections for basic x64 gadgets, described by an options JSON.
 #[function]
 fn binary_gadgets(ctx: CallContext) -> Result<JsValue> {
-    ctf::binary_gadgets(ctx)
+    solver::binary_gadgets(ctx)
 }
 
 /// Decodes a JWT header and payload without verifying its signature.
 #[function]
 fn jwt_decode(ctx: CallContext) -> Result<JsValue> {
-    ctf::jwt_decode(ctx)
+    solver::jwt_decode(ctx)
+}
+
+/// Identifies common packers from section names and image markers.
+#[function]
+fn binary_packer(ctx: CallContext) -> Result<JsValue> {
+    challenge::binary_packer(ctx)
+}
+
+/// Decodes or brute-forces a Caesar rotation over one byte range.
+#[function]
+fn binary_caesar(ctx: CallContext) -> Result<JsValue> {
+    solver::binary_caesar(ctx)
+}
+
+/// Walks PNG chunks and extracts text and trailing data.
+#[function]
+fn binary_png(ctx: CallContext) -> Result<JsValue> {
+    challenge::binary_png(ctx)
+}
+
+/// Summarizes one classic pcap capture.
+#[function]
+fn binary_pcap(ctx: CallContext) -> Result<JsValue> {
+    challenge::binary_pcap(ctx)
+}
+
+/// Decomposes one URL string without making a request.
+#[function]
+fn url_parse(ctx: CallContext) -> Result<JsValue> {
+    solver::url_parse(ctx)
+}
+
+/// Generates a de Bruijn cyclic pattern and optionally locates a value.
+#[function]
+fn cyclic_run(ctx: CallContext) -> Result<JsValue> {
+    solver::cyclic_run(ctx)
 }
 
 /// Decodes one `7z`, `asar`, `NSIS` or PyInstaller container, described by an options JSON.
 #[function]
 fn binary_unpack(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_unpack(ctx)
+    binary::binary_unpack(ctx)
 }
 
 /// Reports the PE overlay anatomy and its embedded container signatures.
 #[function]
 fn binary_overlay(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_overlay(ctx)
+    binary::binary_overlay(ctx)
 }
 
 /// Renders a canonical hex dump of one byte range.
@@ -185,169 +285,169 @@ fn binary_symbols(ctx: CallContext) -> Result<JsValue> {
 /// Lists PE debug directory entries and `CodeView` PDB records.
 #[function]
 fn binary_debug(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_debug(ctx)
+    binary::binary_debug(ctx)
 }
 
 /// Decodes the PE version resource.
 #[function]
 fn binary_version(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_version(ctx)
+    binary::binary_version(ctx)
 }
 
 /// Decodes Mach-O load commands, segments, sections, dylibs and identity.
 #[function]
 fn binary_macho(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho(ctx)
+    binary::binary_macho(ctx)
 }
 
 /// Lists the PE resource directory leaves.
 #[function]
 fn binary_resources(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_resources(ctx)
+    binary::binary_resources(ctx)
 }
 
 /// Summarises the PE mitigation posture.
 #[function]
 fn binary_mitigations(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_mitigations(ctx)
+    binary::binary_mitigations(ctx)
 }
 
 /// Decodes the PE exception directory runtime functions.
 #[function]
 fn binary_exception(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_exception(ctx)
+    binary::binary_exception(ctx)
 }
 
 /// Decodes the PE delay-import descriptors and their thunks.
 #[function]
 fn binary_delay_imports(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_delay_imports(ctx)
+    binary::binary_delay_imports(ctx)
 }
 
 /// Decodes the PE bound-import descriptors and their forwarder refs.
 #[function]
 fn binary_bound_imports(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_bound_imports(ctx)
+    binary::binary_bound_imports(ctx)
 }
 
 /// Decodes the Rich header build stamp between the DOS stub and the PE header.
 #[function]
 fn binary_rich_header(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_rich_header(ctx)
+    binary::binary_rich_header(ctx)
 }
 
 /// Lists the ELF static symbol table (`.symtab`) entries.
 #[function]
 fn binary_static_symbols(ctx: CallContext) -> Result<JsValue> {
-    elf::binary_static_symbols(ctx)
+    binary::binary_static_symbols(ctx)
 }
 
 /// Decodes the PE base relocation blocks.
 #[function]
 fn binary_relocations(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_relocations(ctx)
+    binary::binary_relocations(ctx)
 }
 
 /// Reports ELF `PT_INTERP` and `PT_DYNAMIC` dependencies.
 #[function]
 fn binary_dynamic(ctx: CallContext) -> Result<JsValue> {
-    elf::binary_dynamic(ctx)
+    binary::binary_dynamic(ctx)
 }
 
 /// Decodes ELF notes: build id, GNU ABI tag and GNU properties.
 #[function]
 fn binary_notes(ctx: CallContext) -> Result<JsValue> {
-    elf::binary_notes(ctx)
+    binary::binary_notes(ctx)
 }
 
 /// Lists the PE attribute certificate table entries.
 #[function]
 fn binary_certificates(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_certificates(ctx)
+    binary::binary_certificates(ctx)
 }
 
 /// Decodes the PE TLS directory and its callback array.
 #[function]
 fn binary_tls(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_tls(ctx)
+    binary::binary_tls(ctx)
 }
 
 /// Decodes the PE load configuration directory.
 #[function]
 fn binary_load_config(ctx: CallContext) -> Result<JsValue> {
-    pe::binary_load_config(ctx)
+    binary::binary_load_config(ctx)
 }
 
 /// Decodes the ELF program header table.
 #[function]
 fn binary_segments(ctx: CallContext) -> Result<JsValue> {
-    elf::binary_segments(ctx)
+    binary::binary_segments(ctx)
 }
 
 /// Decodes the Mach-O embedded code signature.
 #[function]
 fn binary_code_signature(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_code_signature(ctx)
+    binary::binary_code_signature(ctx)
 }
 
 /// Lists the Mach-O `LC_SYMTAB` symbol table.
 #[function]
 fn binary_macho_symbols(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_symbols(ctx)
+    binary::binary_macho_symbols(ctx)
 }
 
 /// Decodes the Mach-O dyld export trie.
 #[function]
 fn binary_macho_exports(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_exports(ctx)
+    binary::binary_macho_exports(ctx)
 }
 
 /// Decodes the Mach-O `LC_ENCRYPTION_INFO` command.
 #[function]
 fn binary_macho_encryption(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_encryption(ctx)
+    binary::binary_macho_encryption(ctx)
 }
 
 /// Decodes the Mach-O `LC_DYLD_CHAINED_FIXUPS` imports.
 #[function]
 fn binary_macho_chained_fixups(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_chained_fixups(ctx)
+    binary::binary_macho_chained_fixups(ctx)
 }
 
 /// Decodes the Mach-O classic dyld bind opcode streams.
 #[function]
 fn binary_macho_bindings(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_bindings(ctx)
+    binary::binary_macho_bindings(ctx)
 }
 
 /// Decodes the Mach-O function start delta table.
 #[function]
 fn binary_macho_function_starts(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_function_starts(ctx)
+    binary::binary_macho_function_starts(ctx)
 }
 
 /// Lists the architecture slices of a fat/universal Mach-O container.
 #[function]
 fn binary_macho_slices(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_slices(ctx)
+    binary::binary_macho_slices(ctx)
 }
 
 /// Writes one fat/universal Mach-O slice to `output`.
 #[function]
 fn binary_macho_extract(ctx: CallContext) -> Result<JsValue> {
-    macho::binary_macho_extract(ctx)
+    binary::binary_macho_extract(ctx)
 }
 
 /// Disassembles x86 / x64 instructions or CPython bytecode, described by an options JSON.
 #[function]
 fn binary_disasm(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_disasm(ctx)
+    binary::binary_disasm(ctx)
 }
 
 /// Searches for a hex, ASCII or UTF-16LE pattern described by an options JSON.
 #[function]
 fn binary_search(ctx: CallContext) -> Result<JsValue> {
-    scan::binary_search(ctx)
+    binary::binary_search(ctx)
 }
 
 /// Computes whole-file and per-section entropy plus the PE overlay.
@@ -460,6 +560,12 @@ register_module![
     binary_xor,
     binary_gadgets,
     jwt_decode,
+    binary_packer,
+    binary_caesar,
+    binary_png,
+    binary_pcap,
+    url_parse,
+    cyclic_run,
     binary_unpack,
     binary_overlay,
     binary_offset_to_va,

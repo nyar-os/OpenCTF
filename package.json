@@ -12,7 +12,7 @@
         "fmt": "cargo fmt --all",
         "p": "git push && git push --tags --prune",
         "reset": "git reset Head~ --soft",
-        "check:rust": "cargo fmt -p open-ctf-core -p open-ctf-napi -- --check && cargo clippy -p open-ctf-core -p open-ctf-napi --all-targets -- -D warnings && cargo test -p open-ctf-core -p open-ctf-napi",
+        "check:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
         "build:napi": "wae native build",
         "build:ts": "pnpm --filter @wae/open-ctf run build",
         "build:ui": "pnpm --filter @wae/open-ctf-ui run build",

@@ -11,6 +11,72 @@ then `unpack` for an embedded container, then `disasm` (machine code or
 Crypto, steganography and web exploitation are out of scope, and the matrix is
 the only support claim that counts.
 
+## Repository map
+
+| Crate                       | Owns                                                                | Tests |
+|-----------------------------|---------------------------------------------------------------------|-------|
+| `ctf-domain` (`open-ctf-domain`) | `Challenge`, `Candidate`/`CandidateSet`, `Evidence`, `ChallengeReport`, `CtfError`, the `OpenCtf`/`BinaryView` session, the byte-observation projections over the pinned `data-binary-inspect`, and `workflow/{identify,triage,solve,verify}` | `tests/{challenge,candidate,workflow}.rs` |
+| `ctf-solvers` (`open-ctf-solvers`) | Caesar, XOR, cyclic, decoders, digests, JWT, URL                | `tests/{algorithms,fixtures}.rs` |
+| `ctf-formats` (`open-ctf-formats`) | pcap, png, packer, `archive` (ASAR) and the pending copies of Boost format owners | `tests/projections.rs` |
+| `ctf-napi` (`open-ctf-napi`) | JSON-in/JSON-out exports, the handle table, the WebView host       | no tests; the surface is asserted through the CLI/SDK |
+
+Rules an agent must not break:
+
+- A fact belongs to the crate that owns it: format facts in `ctf-formats`,
+  algorithm behavior in `ctf-solvers`, product workflow and ranking in
+  `ctf-domain`. Do not add a parser to `ctf-domain` or a workflow to
+  `ctf-formats`.
+- `ctf-formats` and `ctf-solvers` never depend on each other or on
+  `ctf-domain`; they surface the upstream `InspectError` re-exported as
+  `CtfError`.
+- Assertions live in `tests/`, never in a `#[cfg(test)]` module under `src/`.
+  A format-fact assertion goes to `projections.rs`, an algorithm assertion to
+  `algorithms.rs`, a product-workflow assertion to `workflow.rs`.
+- `documentation/duplication.md` is the ledger of modules that still copy a
+  Boost owner. If you fix or extend one, keep its `TODO(boost): owner migration`
+  marker and update the table.
+- The six byte-observation projections in `ctf-domain` (`diff`, `find`, `text`,
+  `dump`, `entropy`, `carve`) must not grow a local scanner again. Call the
+  pinned `data-binary-inspect` revision recorded in `duplication.md`; only
+  product policy (options, paging, evidence, report shape) belongs there.
+- Standard hex/base64 text conversions go through `boost_crypto::encoding`,
+  which is the data-encoding-backed boundary. Do not hand-roll another hex loop
+  and do not add `data-encoding` as a new external crate; `inflate`/`overlay`
+  space-separated windows are display policy and stay as-is.
+
+## Capability status
+
+The matrix in `capabilities()` is the support claim; ownership is separate:
+
+- **migrated** — read from the pinned Boost owner, no copy here. `diff`, `find`,
+  `text`, `dump`, `entropy` and `carve` are here: their options, paging and
+  report shape stay product-side, but the byte observation calls
+  `data-binary-inspect` and the compression decoders call `data-compression`,
+  both pinned at `f191fdc4134a5be749f289315dfcacc7c4ad9200`. The DEFLATE family
+  in `inflate`, `nsis`, `pyinstaller` and `png` is migrated the same way to
+  `data-compression`; the Brotli decode of `tauri` is `Brotli::decode_bounded`.
+  `miniz_oxide` and the third-party `brotli` crate are no longer dependencies.
+  In `ctf-formats`, `disasm` calls `data-binary-x64::decode` (behind the
+  `decode` feature), `elf_symbols` calls `data-binary-pe::elf`, and
+  `macho/symbols` calls `data-binary-mach-o`; `probe` uses
+  `data-binary-probe`. `iced-x86` was deleted from the manifests and
+  `Cargo.lock`, so `cargo tree -e normal,build,dev -i iced-x86` is empty.
+- **duplicated** — a copy of an owner that exists; marked
+  `TODO(boost): owner migration` and listed in `documentation/duplication.md`
+  together with the missing field that keeps it product-side. The remaining 29
+  `ctf-formats` modules are here.
+- **product-local** — no owner today; it moves upstream in a later wiring pass.
+
+A duplicated or product-local capability is still a truthful answer: never call
+it unsupported, and never claim it is migrated.
+
+The shared `data-binary-inspect::InspectError` re-export path is part of the
+contract: migrated modules and format projections return that error unchanged,
+and `ctf-domain/src/error.rs` converts it once into `CtfError`. `find` keeps a
+byte-regex matcher for patterns the owner cannot express as literals; plain
+literal patterns call `find::find`.
+
+
 ## Capability discovery
 
 Start every task with the matrix, not with a file extension:
@@ -84,7 +150,9 @@ containers are rejected, and unknown containers are rejected.
   `binary/parse`.
 - `tauri-assets` defaults to 200 assets; the engine clamps `--limit` to 1,000.
   A PE without an interleaved Tauri asset table answers an empty report; a
-  non-PE input is `binary/parse`.
+  non-PE input is `binary/parse`. Each asset blob must decode as one complete
+  Brotli stream that consumes its declared length; trailing bytes reject the
+  record.
 - `disasm` defaults to 64 instructions and caps at 4,096.
 - `diff` reports at most 64 differing ranges.
 - Every bounded report carries `total` and `truncated`.
@@ -132,6 +200,14 @@ Branch on `code`, never on message text. CLI usage failures add
 
 | Path                                                         | Contents                                 |
 |--------------------------------------------------------------|------------------------------------------|
+| `projects/crates/ctf-domain/src/challenge.rs`                | `Challenge`, `BinaryView`, `OpenCtf`.    |
+| `projects/crates/ctf-domain/src/report.rs`                   | `capabilities()` and `ChallengeReport`.  |
+| `projects/crates/ctf-domain/src/error.rs`                    | Stable `CtfError` and `Result`.          |
+| `projects/crates/ctf-domain/src/workflow/`                   | Identify, triage, solve, verify.         |
+| `projects/crates/ctf-solvers/src/`                           | One solver algorithm per file.           |
+| `projects/crates/ctf-formats/src/`                           | One format projection (or pending copy) per file. |
+| `projects/crates/ctf-napi/src/lib.rs`                        | Entry points and the handle table.       |
+| `documentation/duplication.md`                               | Duplicated and product-local modules.    |
 | `projects/packages/open-ctf/src/api.ts`                      | `OpenCTF` session and `capabilities()`.  |
 | `projects/packages/open-ctf/src/types.ts`                    | Every report shape.                      |
 | `projects/packages/open-ctf/src/errors.ts`                   | Stable codes and `translateNativeError`. |
