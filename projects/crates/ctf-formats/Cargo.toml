@@ -22,6 +22,7 @@ data-binary-sevenz = { workspace = true }
 data-binary-probe = { workspace = true }
 data-binary-x64 = { workspace = true }
 data-compression = { workspace = true }
+data-checksum = { workspace = true }
 boost-crypto = { workspace = true }
 boost-source = { workspace = true }
 

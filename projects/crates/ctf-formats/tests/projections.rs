@@ -2729,6 +2729,58 @@ fn inflate_decodes_a_zlib_stream() {
 }
 
 #[test]
+fn inflate_rejects_a_truncated_zlib_trailer() {
+    let mut stream = unhex("789ccb2f48cdd34d2e4953c8cc4bcb492c495528cecdcf4e5528492d2e512848acccc94f4c0100ed550d49");
+    stream.truncate(stream.len() - 4);
+
+    let error = BinaryView::from_bytes("truncated.bin", stream)
+        .inflate(&InflateOptions { offset: 0, format: InflateFormat::Zlib, limit: 1024, output: None })
+        .expect_err("a cut zlib stream must not return a partial plaintext as success");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("input-truncated"), "got {}", error.message());
+}
+
+#[test]
+fn inflate_rejects_a_truncated_raw_deflate_stream() {
+    // `03 00` is a valid empty final fixed-Huffman block; keeping only `03`
+    // removes the end-of-block symbol.
+    let stream = vec![0x03u8];
+
+    let error = BinaryView::from_bytes("truncated-deflate.bin", stream)
+        .inflate(&InflateOptions { offset: 0, format: InflateFormat::Raw, limit: 1024, output: None })
+        .expect_err("a truncated raw DEFLATE stream must fail");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("input-truncated"), "got {}", error.message());
+}
+
+#[test]
+fn inflate_rejects_a_bad_gzip_crc32() {
+    // Fixed gzip member; the last eight bytes are `CRC-32` and `ISIZE`.
+    let mut stream = unhex("1f8b080000000000000a4bafca2c502848acccc94f4c0100cd72f5c00c000000");
+    let crc = stream.len() - 6;
+    stream[crc] ^= 0xff;
+
+    let error = BinaryView::from_bytes("bad-crc.gz", stream)
+        .inflate(&InflateOptions { offset: 0, format: InflateFormat::Gzip, limit: 1024, output: None })
+        .expect_err("a gzip CRC-32 mismatch must fail");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("checksum"), "got {}", error.message());
+}
+
+#[test]
+fn inflate_rejects_a_bad_zlib_adler32() {
+    let mut stream = unhex("789ccb2f48cdd34d2e4953c8cc4bcb492c495528cecdcf4e5528492d2e512848acccc94f4c0100ed550d49");
+    let last = stream.len() - 1;
+    stream[last] ^= 0xff;
+
+    let error = BinaryView::from_bytes("bad-adler.bin", stream)
+        .inflate(&InflateOptions { offset: 0, format: InflateFormat::Zlib, limit: 1024, output: None })
+        .expect_err("the checksum must reject the stream");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("checksum"));
+}
+
+#[test]
 fn inflate_decodes_a_gzip_stream_and_writes_the_output() {
     // Node.js 24.18.0 `zlib.gzipSync("gzip payload", { level: 6 })`. The
     // plaintext is 12 bytes, SHA-256
@@ -3087,6 +3139,16 @@ fn unpack_rejects_a_non_sevenz_input_on_the_explicit_route() {
     let file = TempFile::new("sevenz-bad");
     file.write(&pe_bytes());
     let view = BinaryView::open(file.path()).expect("open PE");
+    let error = view.unpack(&UnpackOptions { format: UnpackFormat::SevenZ, ..UnpackOptions::default() }).unwrap_err();
+    assert_eq!(error.code(), "binary/parse");
+}
+
+#[test]
+fn unpack_rejects_a_truncated_sevenz_signature_header() {
+    let mut bytes = b"7z\xbc\xaf\x27\x1c".to_vec();
+    bytes.extend_from_slice(&[0, 0]);
+
+    let view = BinaryView::from_bytes("truncated.7z", bytes);
     let error = view.unpack(&UnpackOptions { format: UnpackFormat::SevenZ, ..UnpackOptions::default() }).unwrap_err();
     assert_eq!(error.code(), "binary/parse");
 }
@@ -3755,6 +3817,84 @@ fn png_reports_text_chunks_and_trailing_data() {
     assert_eq!(report.chunks[1].keyword.as_deref(), Some("Comment"));
     assert_eq!(report.chunks[1].text.as_deref(), Some("flag{png}"));
     assert_eq!(report.trailing_bytes, 4);
+}
+
+#[test]
+fn png_verifies_the_chunk_crc() {
+    // `IEND` with an empty payload has the fixed CRC-32 `0xae426082`.
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&0u32.to_be_bytes());
+    bytes.extend_from_slice(b"IEND");
+    bytes.extend_from_slice(&0xae42_6082u32.to_be_bytes());
+
+    let report = BinaryView::from_bytes("valid.png", bytes).png(&PngOptions::default()).expect("png");
+    assert_eq!(report.chunk_count, 1);
+    assert_eq!(report.crc_mismatches, 0);
+    assert!(report.chunks[0].crc_ok);
+    assert!(report.complete);
+}
+
+#[test]
+fn png_reports_a_crc_mismatch_as_a_fact() {
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&0u32.to_be_bytes());
+    bytes.extend_from_slice(b"IEND");
+    bytes.extend_from_slice(&0u32.to_be_bytes());
+
+    let report = BinaryView::from_bytes("bad-crc.png", bytes).png(&PngOptions::default()).expect("png");
+    assert_eq!(report.crc_mismatches, 1);
+    assert!(!report.chunks[0].crc_ok);
+    assert!(report.complete, "a CRC mismatch is a fact, not a walk failure");
+}
+
+#[test]
+fn png_rejects_a_chunk_whose_length_runs_past_the_end() {
+    // The `IHDR` header declares 13 payload bytes but only 5 are present.
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&13u32.to_be_bytes());
+    bytes.extend_from_slice(b"IHDR");
+    bytes.extend_from_slice(&[0, 0, 0, 2, 0]);
+
+    let error = BinaryView::from_bytes("truncated.png", bytes)
+        .png(&PngOptions::default())
+        .expect_err("a chunk length past the end must fail the walk");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("past the end of the file"), "got {}", error.message());
+}
+
+#[test]
+fn png_reports_trailing_garbage_after_iend_as_an_integrity_fact() {
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&0u32.to_be_bytes());
+    bytes.extend_from_slice(b"IEND");
+    bytes.extend_from_slice(&0xae42_6082u32.to_be_bytes());
+    bytes.extend_from_slice(b"TAIL");
+
+    let report = BinaryView::from_bytes("trailing.png", bytes).png(&PngOptions::default()).expect("png");
+    assert!(report.complete);
+    assert_eq!(report.trailing_offset, Some(20));
+    assert_eq!(report.trailing_bytes, 4);
+    assert_eq!(report.crc_mismatches, 0);
+}
+
+#[test]
+fn png_rejects_a_ztxt_payload_that_does_not_inflate() {
+    // A valid keyword and method byte followed by an illegal zlib payload.
+    let mut data = b"Comment\0".to_vec();
+    data.push(0);
+    data.extend_from_slice(&[0x78, 0x9c, 0xff, 0xff]);
+
+    let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+    bytes.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    bytes.extend_from_slice(b"zTXt");
+    bytes.extend_from_slice(&data);
+    bytes.extend_from_slice(&[0u8; 4]);
+
+    let error = BinaryView::from_bytes("bad-ztxt.png", bytes)
+        .png(&PngOptions::default())
+        .expect_err("a broken zTXt payload must not be skipped");
+    assert_eq!(error.code(), "binary/parse");
+    assert!(error.message().contains("not a complete zlib stream"), "got {}", error.message());
 }
 
 #[test]

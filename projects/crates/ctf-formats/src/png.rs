@@ -2,10 +2,12 @@
 //!
 //! The signature and every chunk header are decoded statically; `tEXt`, `zTXt`
 //! and `iTXt` payloads are surfaced as text, and bytes after `IEND` are reported
-//! instead of being silently ignored. Chunk CRCs are not verified, so a reported
-//! chunk is a structural entry rather than proof of integrity.
+//! instead of being silently ignored. Each complete chunk is checked against its
+//! stored CRC-32 through the shared `data-checksum` owner, so a mismatching chunk
+//! is reported as a fact rather than treated as proof of integrity.
 
 use data_binary_inspect::BinarySession;
+use data_checksum::Crc32;
 use data_compression::{CodecLimits, Envelope};
 use serde::{Deserialize, Serialize};
 
@@ -65,6 +67,8 @@ pub struct PngChunk {
     pub keyword: Option<String>,
     /// Decoded text of a `tEXt`, `zTXt` or `iTXt` chunk.
     pub text: Option<String>,
+    /// Whether the stored chunk CRC-32 matches the bytes read.
+    pub crc_ok: bool,
 }
 
 /// Result of one PNG walk.
@@ -83,6 +87,8 @@ pub struct PngReport {
     pub interlace: Option<u8>,
     /// Total chunks seen, before the listing limit.
     pub chunk_count: usize,
+    /// Chunks whose stored CRC-32 did not match, across the whole walk.
+    pub crc_mismatches: usize,
     /// Listed chunks, cut at the limit.
     pub chunks: Vec<PngChunk>,
     /// Whether the chunk list was cut at the limit.
@@ -117,6 +123,7 @@ pub fn analyze(session: &BinarySession, options: &PngOptions) -> Result<PngRepor
         color_type: None,
         interlace: None,
         chunk_count: 0,
+        crc_mismatches: 0,
         chunks: Vec::new(),
         truncated: false,
         complete: false,
@@ -132,10 +139,19 @@ pub fn analyze(session: &BinarySession, options: &PngOptions) -> Result<PngRepor
         let data_offset = cursor + 8;
         let end = match data_offset.checked_add(u64::from(length)).and_then(|end| end.checked_add(4)) {
             Some(end) if end <= size => end,
-            _ => break,
+            _ => {
+                return Err(CtfError::parse(format!(
+                    "PNG chunk {index} ({kind}) declares {length} payload bytes past the end of the file"
+                )));
+            }
         };
         report.chunk_count += 1;
+        let crc_ok = chunk_crc_ok(session, &header[4..8], data_offset, length, end - 4)?;
+        if !crc_ok {
+            report.crc_mismatches += 1;
+        }
         let (keyword, text) = extract_text(session, &kind, data_offset, length)?;
+
         if kind == "IHDR" && length >= 13 {
             let data = session.read(data_offset, 13)?;
             report.width = Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
@@ -145,7 +161,9 @@ pub fn analyze(session: &BinarySession, options: &PngOptions) -> Result<PngRepor
             report.interlace = Some(data[12]);
         }
         if report.chunks.len() < limit {
-            report.chunks.push(PngChunk { index, kind: kind.clone(), length, offset: cursor, data_offset, keyword, text });
+            report
+                .chunks
+                .push(PngChunk { index, kind: kind.clone(), length, offset: cursor, data_offset, keyword, text, crc_ok });
         }
         else {
             report.truncated = true;
@@ -164,13 +182,29 @@ pub fn analyze(session: &BinarySession, options: &PngOptions) -> Result<PngRepor
     Ok(report)
 }
 
+/// Compares the stored chunk CRC-32 with the chunk type and payload.
+fn chunk_crc_ok(
+    session: &BinarySession,
+    kind: &[u8],
+    data_offset: u64,
+    length: u32,
+    crc_offset: u64,
+) -> Result<bool> {
+    let mut crc = Crc32::new();
+    crc.update(kind);
+    crc.update(session.read(data_offset, u64::from(length))?);
+    let stored = session.read(crc_offset, 4)?;
+    let stored = u32::from_be_bytes([stored[0], stored[1], stored[2], stored[3]]);
+    Ok(stored == crc.value())
+}
+
 fn extract_text(session: &BinarySession, kind: &str, offset: u64, length: u32) -> Result<(Option<String>, Option<String>)> {
     if !matches!(kind, "tEXt" | "zTXt" | "iTXt") || length == 0 {
         return Ok((None, None));
     }
     let read = u64::from(length).min(TEXT_READ_LIMIT);
     let data = session.read(offset, read)?;
-    Ok(match kind {
+    let fields = match kind {
         "tEXt" => {
             let Some((keyword, text)) = take_field(data)
             else {
@@ -187,8 +221,7 @@ fn extract_text(session: &BinarySession, kind: &str, offset: u64, length: u32) -
             else {
                 return Ok((None, None));
             };
-            let text = inflate(compressed).map(|bytes| latin1_limited(&bytes));
-            (Some(latin1(keyword)), text)
+            (Some(latin1(keyword)), Some(latin1_limited(&inflate(compressed)?)))
         }
         "iTXt" => {
             let Some((keyword, rest)) = take_field(data)
@@ -211,16 +244,22 @@ fn extract_text(session: &BinarySession, kind: &str, offset: u64, length: u32) -
             else {
                 return Ok((None, None));
             };
-            let decoded = if flag.first() == Some(&b'1') { inflate(text) } else { Some(text.to_vec()) };
-            (Some(latin1(keyword)), decoded.map(|bytes| latin1_limited(&bytes)))
+            let decoded = if flag.first() == Some(&b'1') { inflate(text)? } else { text.to_vec() };
+            (Some(latin1(keyword)), Some(latin1_limited(&decoded)))
         }
         _ => (None, None),
-    })
+    };
+    Ok(fields)
 }
 
-fn inflate(bytes: &[u8]) -> Option<Vec<u8>> {
+fn inflate(bytes: &[u8]) -> Result<Vec<u8>> {
     let decoded = Envelope::Zlib.decode(bytes, CodecLimits::new().with_max_output_bytes(TEXT_OUTPUT_LIMIT as u64));
-    decoded.is_complete().then_some(decoded.output)
+    if decoded.is_complete() {
+        Ok(decoded.output)
+    }
+    else {
+        Err(CtfError::parse(format!("the PNG text payload is not a complete zlib stream ({})", decoded.status.code())))
+    }
 }
 
 fn take_field(data: &[u8]) -> Option<(&[u8], &[u8])> {

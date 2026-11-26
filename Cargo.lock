@@ -630,6 +630,7 @@ dependencies = [
  "data-binary-probe",
  "data-binary-sevenz",
  "data-binary-x64",
+ "data-checksum",
  "data-compression",
  "open-ctf-domain",
  "serde",

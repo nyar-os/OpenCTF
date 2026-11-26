@@ -7,9 +7,9 @@
 //! Nothing is executed: only bytes are decoded.
 //!
 //! The stream decode itself is the pinned `data-compression` owner: the zlib
-//! wrapper uses [`Envelope::Zlib`] and raw DEFLATE uses [`Envelope::Raw`]. The
-//! gzip route strips the member header and decodes the bare DEFLATE payload with
-//! [`Envelope::Raw`], exactly as this projection did before the migration.
+//! wrapper uses [`Envelope::Zlib`], the gzip member uses [`Envelope::Gzip`] and
+//! raw DEFLATE uses [`Envelope::Raw`], so the member header, `CRC-32` and
+//! `ISIZE` trailer are validated by the same owner.
 
 use std::path::Path;
 
@@ -116,7 +116,7 @@ pub fn decode(session: &BinarySession, options: &InflateOptions) -> Result<Infla
 
     let (output, status) = match format {
         InflateFormat::Zlib => run(Envelope::Zlib.decode(bytes, limit_of(limit))),
-        InflateFormat::Gzip => run(Envelope::Raw.decode(gzip_payload(bytes)?, limit_of(limit))),
+        InflateFormat::Gzip => run(Envelope::Gzip.decode(bytes, limit_of(limit))),
         InflateFormat::Raw => run(Envelope::Raw.decode(bytes, limit_of(limit))),
         InflateFormat::Auto => unreachable!("auto is resolved before decoding"),
     }?;
@@ -159,16 +159,17 @@ fn limit_of(limit: usize) -> CodecLimits {
 
 /// Turns a bounded decode into decoded bytes plus a stable status name.
 ///
-/// Only a complete stream, a stream stopped by the output cap and a stream cut
-/// by the end of the file produce output. Anything else is rejected, so a wrong
-/// offset never leaves a file full of garbage behind.
+/// Only a complete stream and a stream stopped by the output cap produce
+/// output. A truncated stream, a checksum failure or malformed input is
+/// rejected, so a cut or corrupted range never returns a partial plaintext as a
+/// success.
 fn run(decoded: BoundedDecode) -> Result<(Vec<u8>, &'static str)> {
     let status = status_name(&decoded.status);
     if decoded.is_complete() {
         return Ok((decoded.output, status));
     }
     match status {
-        "output-limit" | "input-truncated" if !decoded.output.is_empty() => Ok((decoded.output, status)),
+        "output-limit" if !decoded.output.is_empty() => Ok((decoded.output, status)),
         _ => Err(CtfError::parse(format!("the selected range did not decode cleanly ({status})"))),
     }
 }
@@ -192,46 +193,6 @@ fn looks_like_zlib(bytes: &[u8]) -> bool {
 /// Whether the bytes start with the gzip magic.
 fn looks_like_gzip(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0x1f, 0x8b])
-}
-
-/// Skips the variable-length gzip header and returns the raw DEFLATE payload.
-fn gzip_payload(bytes: &[u8]) -> Result<&[u8]> {
-    if !looks_like_gzip(bytes) || bytes.len() < 10 {
-        return Err(CtfError::parse("the range does not start with a complete gzip header"));
-    }
-
-    let flags = bytes[3];
-    let mut index = 10usize;
-
-    if flags & 0x04 != 0 {
-        let field = bytes
-            .get(index..index + 2)
-            .ok_or_else(|| CtfError::parse("the gzip extra-length field runs past the end of the file"))?;
-        let extra = u16::from_le_bytes([field[0], field[1]]) as usize;
-        index = index.checked_add(2 + extra).ok_or_else(|| CtfError::parse("the gzip extra field length overflows"))?;
-    }
-    if flags & 0x08 != 0 {
-        index = skip_c_string(bytes, index)?;
-    }
-    if flags & 0x10 != 0 {
-        index = skip_c_string(bytes, index)?;
-    }
-    if flags & 0x02 != 0 {
-        index = index.checked_add(2).ok_or_else(|| CtfError::parse("the gzip header checksum offset overflows"))?;
-    }
-
-    bytes.get(index..).ok_or_else(|| CtfError::parse("the gzip header runs past the end of the file"))
-}
-
-/// Advances past a zero-terminated header string.
-fn skip_c_string(bytes: &[u8], mut index: usize) -> Result<usize> {
-    while index < bytes.len() {
-        if bytes[index] == 0 {
-            return Ok(index + 1);
-        }
-        index += 1;
-    }
-    Err(CtfError::parse("a gzip header string is not terminated"))
 }
 
 /// Renders bytes as lowercase spaced hex.

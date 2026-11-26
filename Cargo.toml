@@ -28,6 +28,7 @@ data-binary-mach-o = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c
 data-binary-container = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
 data-binary-sevenz = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
 data-compression = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c", features = ["deflate", "brotli"] }
+data-checksum = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
 data-binary-probe = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
 data-binary-x64 = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c", default-features = false, features = ["decode"] }
 boost-crypto = { git = "https://github.com/oovm/boost.rs", rev = "3e865d5c" }
