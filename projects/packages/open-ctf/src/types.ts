@@ -1625,6 +1625,8 @@ export interface PngChunk {
     readonly dataOffset: number;
     readonly keyword: string | null;
     readonly text: string | null;
+    /** Whether the stored chunk CRC-32 matches the chunk bytes. */
+    readonly crcOk: boolean;
 }
 
 /** Result of one PNG walk. */
@@ -1635,6 +1637,8 @@ export interface PngReport {
     readonly colorType: number | null;
     readonly interlace: number | null;
     readonly chunkCount: number;
+    /** Complete chunks whose stored CRC-32 did not match. */
+    readonly crcMismatches: number;
     readonly chunks: readonly PngChunk[];
     readonly truncated: boolean;
     readonly complete: boolean;
@@ -1678,5 +1682,98 @@ export interface PcapReport {
     readonly protocols: readonly PcapProtocol[];
     readonly endpoints: readonly PcapEndpoint[];
     readonly truncated: boolean;
+}
+
+/** Whether this build can open a live radio instead of reading a capture file. */
+export interface CaptureSupport {
+    readonly live: boolean;
+    readonly reason: string;
+}
+
+/** Inputs of one `wifi()` call. */
+export interface WifiOptions {
+    /** File offset of the capture magic; defaults to zero. */
+    readonly offset?: number;
+    /** Cap on decoded frames; capped at two million. */
+    readonly limit?: number;
+}
+
+/** One access point and what its beacons advertise. */
+export interface WifiSsid {
+    readonly bssid: string;
+    readonly ssid: string;
+    readonly channel: number | null;
+    readonly band: string;
+    readonly security: string;
+    readonly frames: number;
+}
+
+/** One decoded frame-type counter. */
+export interface WifiFrameType {
+    readonly label: string;
+    readonly count: number;
+}
+
+/** Result of one 802.11 capture summary. */
+export interface WifiReport {
+    readonly format: string;
+    readonly link: string;
+    readonly frames: number;
+    readonly bytes: number;
+    readonly firstTimestamp: number | null;
+    readonly lastTimestamp: number | null;
+    readonly frameTypes: readonly WifiFrameType[];
+    readonly ssids: readonly WifiSsid[];
+    readonly truncated: boolean;
+    readonly capture: CaptureSupport;
+}
+
+/** Inputs of one `wifiHandshake()` call. */
+export interface EapolOptions {
+    /** File offset of the capture magic; defaults to zero. */
+    readonly offset?: number;
+    /** Cap on decoded frames; capped at two million. */
+    readonly limit?: number;
+    /** SSID used for PMK derivation; inferred from beacons when absent. */
+    readonly ssid?: string;
+    /** Candidate passphrases tested against each complete handshake; capped at 256. */
+    readonly passphrases?: readonly string[];
+}
+
+/** One EAPOL-Key message observed while walking a capture. */
+export interface EapolMessage {
+    readonly number: number;
+    readonly fromAp: boolean;
+    readonly replay: number;
+    readonly keyVersion: number;
+    readonly install: boolean;
+    readonly secure: boolean;
+    readonly nonce: string;
+}
+
+/** One four-way handshake grouped by access point and station. */
+export interface EapolHandshake {
+    readonly bssid: string;
+    readonly station: string;
+    readonly ssid: string | null;
+    readonly messages: readonly EapolMessage[];
+    readonly complete: boolean;
+    readonly anonce: string | null;
+    readonly snonce: string | null;
+    readonly micVerified: boolean;
+    readonly passphrase: string | null;
+    readonly checked: number;
+}
+
+/** Result of one WPA2 handshake extraction. */
+export interface EapolReport {
+    readonly format: string;
+    readonly link: string;
+    readonly frames: number;
+    readonly eapolFrames: number;
+    readonly handshakes: readonly EapolHandshake[];
+    readonly passphrasesChecked: number;
+    readonly truncated: boolean;
+    readonly capture: CaptureSupport;
 }
 

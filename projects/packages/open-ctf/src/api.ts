@@ -33,6 +33,8 @@ import type {
     ElfSegmentsReport,
     ElfStaticSymbolsReport,
     EncodedStringsReport,
+    EapolOptions,
+    EapolReport,
     EntropyReport,
     ExportsReport,
     FindOptions,
@@ -92,6 +94,8 @@ import type {
     TauriAssetsReport,
     UrlReport,
     VersionReport,
+    WifiOptions,
+    WifiReport,
     XorOptions,
     XorReport,
 } from './types.js';
@@ -405,6 +409,16 @@ export class OpenCTF {
     /** Summarizes one classic pcap capture. */
     pcap(options: PcapOptions = {}): PcapReport {
         return decode<PcapReport>(() => binding('binary.pcap').binary_pcap(this.id, JSON.stringify(options)));
+    }
+
+    /** Summarizes one 802.11 capture (pcapng or classic pcap). */
+    wifi(options: WifiOptions = {}): WifiReport {
+        return decode<WifiReport>(() => binding('binary.wifi').binary_wifi(this.id, JSON.stringify(options)));
+    }
+
+    /** Extracts WPA2 four-way handshakes and tests candidate passphrases. */
+    wifiHandshake(options: EapolOptions = {}): EapolReport {
+        return decode<EapolReport>(() => binding('binary.wifiHandshake').binary_wifi_handshake(this.id, JSON.stringify(options)));
     }
 
     /** Searches for a hex, ASCII or UTF-16LE pattern. */

@@ -224,6 +224,18 @@ fn binary_pcap(ctx: CallContext) -> Result<JsValue> {
     challenge::binary_pcap(ctx)
 }
 
+/// Summarizes one 802.11 capture (pcapng or classic pcap).
+#[function]
+fn binary_wifi(ctx: CallContext) -> Result<JsValue> {
+    challenge::binary_wifi(ctx)
+}
+
+/// Extracts WPA2 four-way handshakes and tests candidate passphrases.
+#[function]
+fn binary_wifi_handshake(ctx: CallContext) -> Result<JsValue> {
+    challenge::binary_wifi_handshake(ctx)
+}
+
 /// Decomposes one URL string without making a request.
 #[function]
 fn url_parse(ctx: CallContext) -> Result<JsValue> {
@@ -573,6 +585,8 @@ register_module![
     binary_caesar,
     binary_png,
     binary_pcap,
+    binary_wifi,
+    binary_wifi_handshake,
     url_parse,
     cyclic_run,
     binary_unpack,

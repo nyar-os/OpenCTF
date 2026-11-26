@@ -70,6 +70,8 @@ export interface NativeBinding {
     binary_caesar(handle: number, optionsJson: string): string;
     binary_png(handle: number, optionsJson: string): string;
     binary_pcap(handle: number, optionsJson: string): string;
+    binary_wifi(handle: number, optionsJson: string): string;
+    binary_wifi_handshake(handle: number, optionsJson: string): string;
     jwt_decode(token: string): string;
     url_parse(url: string): string;
     cyclic_run(optionsJson: string): string;

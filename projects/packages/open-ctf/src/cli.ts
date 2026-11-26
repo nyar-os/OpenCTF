@@ -7,6 +7,7 @@
  * come from `@wae/commander`, so the CLI does not grow its own parser.
  */
 
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -36,6 +37,8 @@ import type {
     ElfSegmentsReport,
     ElfStaticSymbolsReport,
     EncodedStringsReport,
+    EapolOptions,
+    EapolReport,
     EntropyReport,
     ExportsReport,
     FindOptions,
@@ -59,6 +62,8 @@ import type {
     PngOptions,
     PngReport,
     UrlReport,
+    WifiOptions,
+    WifiReport,
     UnpackFormat,
     UnpackOptions,
     DisassemblyFormat,
@@ -2245,6 +2250,37 @@ function describePcap(report: PcapReport): string {
     return lines.join('\n');
 }
 
+function describeWifi(report: WifiReport): string {
+    const flags = `${report.truncated ? ' · truncated' : ''}`;
+    const lines = [`wifi ${report.format} · ${report.link} · ${report.frames} frame(s) · ${report.bytes} byte(s)${flags}`];
+    if (report.frameTypes.length > 0) {
+        lines.push(`types: ${report.frameTypes.map((entry) => `${entry.label}=${entry.count}`).join(', ')}`);
+    }
+    for (const ssid of report.ssids.slice(0, 8)) {
+        const channel = ssid.channel === null ? '?' : `${ssid.channel}`;
+        lines.push(`${ssid.bssid} ${ssid.ssid.length === 0 ? '<hidden>' : ssid.ssid} ch=${channel} ${ssid.band} ${ssid.security} frames=${ssid.frames}`);
+    }
+    lines.push(`live capture: ${report.capture.live ? 'yes' : 'no'} — ${report.capture.reason}`);
+    return lines.join('\n');
+}
+
+function describeWifiHandshake(report: EapolReport): string {
+    const flags = `${report.truncated ? ' · truncated' : ''}`;
+    const lines = [
+        `wifi-handshake ${report.format} · ${report.link} · ${report.frames} frame(s) · ${report.eapolFrames} EAPOL${flags}`,
+    ];
+    for (const handshake of report.handshakes) {
+        const state = handshake.micVerified
+            ? `verified: ${handshake.passphrase ?? ''}`
+            : handshake.complete
+              ? 'not verified'
+              : 'incomplete';
+        lines.push(`${handshake.bssid} <-> ${handshake.station} ssid=${handshake.ssid ?? '?'} ${state} checked=${handshake.checked}`);
+    }
+    lines.push(`candidates checked: ${report.passphrasesChecked}`);
+    return lines.join('\n');
+}
+
 cli.command('url', 'cli.cmd.url').actionCtx(async (options, _args, ctx) => {
     const value = input(options);
     if (value === undefined) {
@@ -2411,6 +2447,105 @@ cli
         try {
             const report = ctf.pcap(pcapOptions);
             ctx.emitResult(report, describePcap(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('wifi', 'cli.cmd.wifi')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--limit <count>', 'cli.opt.limit')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const wifiOptions: WifiOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(limit === undefined ? {} : { limit }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.wifi(wifiOptions);
+            ctx.emitResult(report, describeWifi(report));
+            return 0;
+        } finally {
+            ctf.close();
+        }
+    });
+
+cli
+    .command('wifi-handshake', 'cli.cmd.wifi-handshake')
+    .option('--offset <offset>', 'cli.opt.offset')
+    .option('--limit <count>', 'cli.opt.limit')
+    .option('--ssid <ssid>', 'cli.opt.ssid')
+    .option('--passphrase <text>', 'cli.opt.passphrase')
+    .option('--passlist <path>', 'cli.opt.passlist')
+    .actionCtx(async (options, _args, ctx) => {
+        const file = input(options);
+        if (file === undefined) {
+            ctx.fail('open-ctf.cli.file-required', { message: 'a binary file is required' });
+            return 2;
+        }
+        const offsetText = text(options, 'offset');
+        const offset = offsetText === undefined ? undefined : parseNumber(offsetText);
+        if (offsetText !== undefined && offset === undefined) {
+            ctx.fail('open-ctf.cli.offset', { message: '`--offset <offset>` must be a non-negative integer' });
+            return 2;
+        }
+        const limitText = text(options, 'limit');
+        const limit = limitText === undefined ? undefined : parseNumber(limitText);
+        if (limitText !== undefined && limit === undefined) {
+            ctx.fail('open-ctf.cli.limit', { message: '`--limit <count>` must be a positive integer' });
+            return 2;
+        }
+        const ssid = text(options, 'ssid');
+        const passphrases: string[] = [];
+        const passphrase = text(options, 'passphrase');
+        if (passphrase !== undefined && passphrase.length > 0) {
+            passphrases.push(passphrase);
+        }
+        const passlist = text(options, 'passlist');
+        if (passlist !== undefined) {
+            let content: string;
+            try {
+                content = readFileSync(passlist, 'utf8');
+            } catch (error) {
+                ctx.fail('open-ctf.cli.passlist', { message: `cannot read the passlist: ${String(error)}` });
+                return 2;
+            }
+            for (const line of content.split(/\r?\n/u)) {
+                const candidate = line.trim();
+                if (candidate.length > 0) {
+                    passphrases.push(candidate);
+                }
+            }
+        }
+        const handshakeOptions: EapolOptions = {
+            ...(offset === undefined ? {} : { offset }),
+            ...(limit === undefined ? {} : { limit }),
+            ...(ssid === undefined ? {} : { ssid }),
+            ...(passphrases.length === 0 ? {} : { passphrases }),
+        };
+        const ctf = new OpenCTF({ path: file });
+        try {
+            const report = ctf.wifiHandshake(handshakeOptions);
+            ctx.emitResult(report, describeWifiHandshake(report));
             return 0;
         } finally {
             ctf.close();
