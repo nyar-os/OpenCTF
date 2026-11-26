@@ -182,6 +182,12 @@ fn binary_xor(ctx: CallContext) -> Result<JsValue> {
     solver::binary_xor(ctx)
 }
 
+/// Ranks the XOR and Caesar candidate sets over one byte range.
+#[function]
+fn binary_candidates(ctx: CallContext) -> Result<JsValue> {
+    solver::binary_candidates(ctx)
+}
+
 /// Scans executable sections for basic x64 gadgets, described by an options JSON.
 #[function]
 fn binary_gadgets(ctx: CallContext) -> Result<JsValue> {
@@ -560,6 +566,7 @@ register_module![
     binary_hash,
     binary_decode,
     binary_xor,
+    binary_candidates,
     binary_gadgets,
     jwt_decode,
     binary_packer,

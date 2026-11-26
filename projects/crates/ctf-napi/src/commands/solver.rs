@@ -2,18 +2,27 @@
 //!
 //! Caesar, XOR, digests, decoders, gadgets, JWT, URL and cyclic patterns are
 //! forwarded to `open-ctf-domain`; JWT, URL and cyclic need no file handle.
+//! Ranked candidates cross the Node-API boundary through the private DTOs in
+//! [`crate::dto`], never through the domain model's Rust field layout.
 
 use open_ctf_domain::{
     CaesarOptions, CtfError, CyclicOptions, DecodeOptions, GadgetOptions, HashOptions, XorOptions, cyclic, decode_jwt,
-    parse_url,
+    parse_url, solve,
 };
 use serde_json::Value;
 use wae::{CallContext, JsValue, Result};
 
 use crate::{
+    dto::{CandidateRequest, CandidateResponse},
     error::{encoded, failure, handle, respond, text},
     registry::with_engine,
 };
+
+fn candidates_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
+    let request = CandidateRequest::parse(options_json)?;
+    let options = request.solve_options();
+    with_engine(handle, |engine| encoded(&CandidateResponse::from_set(&solve(engine, &options)?)?))
+}
 
 fn hash_report(handle: u64, options_json: &str) -> std::result::Result<Value, CtfError> {
     let options = crate::dto::request::<HashOptions>(options_json)
@@ -108,6 +117,15 @@ pub(crate) fn binary_caesar(ctx: CallContext) -> Result<JsValue> {
     let handle = handle(&ctx, 0)?;
     let options = text(&ctx, 1)?;
     match caesar_report(handle, &options) {
+        Ok(value) => respond(&ctx, &value),
+        Err(error) => Err(failure(error)),
+    }
+}
+
+pub(crate) fn binary_candidates(ctx: CallContext) -> Result<JsValue> {
+    let handle = handle(&ctx, 0)?;
+    let options = text(&ctx, 1)?;
+    match candidates_report(handle, &options) {
         Ok(value) => respond(&ctx, &value),
         Err(error) => Err(failure(error)),
     }
